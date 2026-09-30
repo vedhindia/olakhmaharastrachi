@@ -1,0 +1,44 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+.nyc_output
+
+# Production
+build
+dist
+
+# Misc
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Uploads
+backend/uploads/
+!backend/uploads/.gitkeep
+!backend/uploads/premium-besan.jpg
+!backend/uploads/fine-gram-flour.jpg
+!backend/uploads/roasted-besan.jpg
+!backend/uploads/superfine-besan.jpg
+!backend/uploads/low-oil-besan.jpg

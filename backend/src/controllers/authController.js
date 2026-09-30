@@ -1,0 +1,284 @@
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const { Op } = require('sequelize');
+const { AdminUser } = require('../models');
+const sendEmail = require('../utils/emailService');
+
+const getPrimaryAdminId = async () => {
+  const envEmail = String(process.env.PRIMARY_ADMIN_EMAIL || '').trim();
+  if (envEmail) {
+    const byEmail = await AdminUser.findOne({ attributes: ['id'], where: { email: envEmail } });
+    if (byEmail) return byEmail.id;
+  }
+  const first = await AdminUser.findOne({ attributes: ['id'], order: [['id', 'ASC']] });
+  return first ? first.id : null;
+};
+
+exports.register = async (req, res) => {
+  try {
+    const { name, email, password, phone, role } = req.body;
+
+    const primaryAdminId = await getPrimaryAdminId();
+    if (primaryAdminId) {
+      return res.status(403).json({ message: 'Admin registration is disabled' });
+    }
+    
+    // Check if admin exists
+    const existingAdmin = await AdminUser.findOne({ where: { email } });
+    if (existingAdmin) {
+      return res.status(400).json({ message: 'Admin already exists' });
+    }
+
+    const admin = await AdminUser.create({ 
+        name, 
+        email, 
+        password,
+        phone,
+        role: role || 'admin'
+    });
+    
+    res.status(201).json({ message: 'Admin registered successfully', adminId: admin.id });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const admin = await AdminUser.findOne({ where: { email } });
+    if (!admin) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    const primaryAdminId = await getPrimaryAdminId();
+    if (primaryAdminId && admin.id !== primaryAdminId) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    if (!admin.status) {
+        return res.status(403).json({ message: 'Account is inactive' });
+    }
+
+    const isMatch = await admin.validatePassword(password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    // Update last login
+    admin.last_login = new Date();
+    await admin.save();
+
+    const token = jwt.sign(
+        { id: admin.id, role: admin.role }, 
+        process.env.JWT_SECRET, 
+        { expiresIn: '1d' }
+    );
+
+    res.json({ 
+        token, 
+        admin: { 
+            id: admin.id, 
+            name: admin.name,
+            email: admin.email,
+            role: admin.role
+        } 
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const adminId = req.admin.id;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ message: 'Current password and new password are required' });
+        }
+
+        if (currentPassword === newPassword) {
+            return res.status(400).json({ message: 'The current password and new password must be different.' });
+        }
+
+        const admin = await AdminUser.findByPk(adminId);
+        if (!admin) {
+            return res.status(404).json({ message: 'Admin not found' });
+        }
+
+        const isMatch = await admin.validatePassword(currentPassword);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Incorrect current password' });
+        }
+
+        admin.password = newPassword; // Hook will hash it
+        await admin.save();
+
+        res.json({ message: 'Password updated successfully' });
+
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+exports.forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const admin = await AdminUser.findOne({ where: { email } });
+        
+        if (!admin) {
+            return res.status(404).json({ message: 'Admin not found' });
+        }
+
+        const primaryAdminId = await getPrimaryAdminId();
+        if (primaryAdminId && admin.id !== primaryAdminId) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Generate token
+        const resetToken = crypto.randomBytes(20).toString('hex');
+        
+        // Hash token and set to resetPasswordToken field
+        // We store the hashed version for security
+        admin.reset_token = crypto.createHash('sha256').update(resetToken).digest('hex');
+        
+        // Set expire (10 mins)
+        admin.reset_token_expiry = Date.now() + 10 * 60 * 1000;
+
+        await admin.save();
+
+        const rawFrontend = process.env.ADMIN_PANEL_URL || req.get('origin') || `${req.protocol}://${req.get('host')}` || 'http://localhost:5173';
+        const normalizedFrontend = /^https?:\/\//i.test(rawFrontend) ? rawFrontend : `${req.protocol}://${rawFrontend}`;
+        const adminPanelBase = (() => {
+            try {
+                const u = new URL(normalizedFrontend);
+                const path = (u.pathname || '').replace(/\/+$/, '');
+                u.pathname = path.endsWith('/admin') ? path : `${path}/admin`;
+                return `${u.origin}${u.pathname}`;
+            } catch {
+                return 'http://localhost:5173/admin';
+            }
+        })();
+        const resetLink = `${adminPanelBase}/reset-password?token=${resetToken}`;
+
+        const message = `
+          <h1>You have requested a password reset</h1>
+          <p>Please go to this link to reset your password:</p>
+          <a href=${resetLink} clicktracking=off>${resetLink}</a>
+        `;
+
+        try {
+            await sendEmail({
+                email: admin.email,
+                subject: 'Password Reset Request',
+                html: message,
+            });
+
+            res.status(200).json({ success: true, message: 'Email sent' });
+        } catch (error) {
+            admin.reset_token = undefined;
+            admin.reset_token_expiry = undefined;
+            await admin.save();
+
+            return res.status(500).json({ message: 'Email could not be sent', error: error.message });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+exports.resetPassword = async (req, res) => {
+    try {
+        const { token, password } = req.body;
+
+        if (!token || !password) {
+            return res.status(400).json({ message: 'Token and password are required' });
+        }
+
+        // Hash token to compare with stored hash
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+        const admin = await AdminUser.findOne({
+            where: {
+                reset_token: hashedToken,
+                reset_token_expiry: { [Op.gt]: Date.now() }
+            }
+        });
+
+        if (!admin) {
+            return res.status(400).json({ message: 'Invalid or expired token' });
+        }
+
+        const primaryAdminId = await getPrimaryAdminId();
+        if (primaryAdminId && admin.id !== primaryAdminId) {
+            return res.status(400).json({ message: 'Invalid or expired token' });
+        }
+
+        // Set new password
+        admin.password = password; // Hook will hash it
+        admin.reset_token = null;
+        admin.reset_token_expiry = null;
+        
+        await admin.save();
+
+        res.json({ success: true, message: 'Password reset successfully' });
+
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+exports.getProfile = async (req, res) => {
+    try {
+        const admin = await AdminUser.findByPk(req.admin.id, {
+            attributes: { exclude: ['password'] }
+        });
+        if (!admin) {
+            return res.status(404).json({ message: 'Admin not found' });
+        }
+        res.json(admin);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+exports.updateProfile = async (req, res) => {
+    try {
+        const { name, email, phone } = req.body;
+        const admin = await AdminUser.findByPk(req.admin.id);
+
+        if (!admin) {
+            return res.status(404).json({ message: 'Admin not found' });
+        }
+
+        // Check if email is being changed and if it's already taken
+        if (email && email !== admin.email) {
+            const existingAdmin = await AdminUser.findOne({ where: { email } });
+            if (existingAdmin) {
+                return res.status(400).json({ message: 'Email already in use' });
+            }
+        }
+
+        admin.name = name || admin.name;
+        admin.email = email || admin.email;
+        admin.phone = phone || admin.phone;
+
+        await admin.save();
+
+        res.json({ 
+            message: 'Profile updated successfully',
+            admin: {
+                id: admin.id,
+                name: admin.name,
+                email: admin.email,
+                phone: admin.phone,
+                role: admin.role
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};

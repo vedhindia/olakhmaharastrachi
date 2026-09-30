@@ -1,0 +1,137 @@
+.navbar-wrapper {
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  position: sticky;
+  top: 0;
+  z-index: 1050;
+  background: #fff;
+  box-shadow: 0 0 0 rgba(0,0,0,0);
+  transition: box-shadow 0.25s ease, background-color 0.25s ease, transform 0.25s ease;
+}
+
+.navbar-wrapper.scrolled {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+}
+
+.navbar-wrapper.scrolled .main-nav {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  transition: padding 0.25s ease;
+}
+.navbar-logo-img {
+  height: 70px; /* Adjust height as needed */
+  width: auto;
+  object-fit: contain;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.tracking-tighter {
+  letter-spacing: -1px;
+}
+
+/* Custom Nav Link Hover */
+.nav-link-custom {
+  transition: color 0.3s ease;
+}
+
+.nav-link-custom:hover,
+.nav-link-custom.active {
+  color: #198754 !important; /* Bootstrap success color */
+}
+
+/* Custom Badge */
+.badge-custom {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background-color: #198754;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Override Bootstrap default toggler focus */
+.navbar-toggler:focus {
+  box-shadow: none;
+}
+
+@media (max-width: 991.98px) {
+  .nav-link-custom {
+    padding: 10px 0;
+    border-bottom: 1px solid #f8f9fa;
+  }
+
+  /* Slide-in mobile menu */
+  .main-nav .navbar-collapse {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: min(320px, 85vw);
+    background: #ffffff;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.12);
+    padding: 16px 20px;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 1200;
+    overflow-y: auto;
+  }
+
+  .main-nav .navbar-collapse.show {
+    transform: translateX(0);
+  }
+
+  /* Space for brand row */
+  .main-nav .navbar-collapse .navbar-nav {
+    margin-top: 12px;
+  }
+
+  /* Close button in panel */
+  .main-nav .navbar-collapse .navbar-close {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 26px;
+    line-height: 1;
+    color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .main-nav .navbar-collapse .navbar-close:hover {
+    background: #f3f3f3;
+  }
+}
+.small{
+  font-size: 13px!important;
+}
+
+/* Navbar search popover */
+.nav-search {
+  position: relative;
+}
+.nav-search-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  width: min(225px, 80vw);
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+  z-index: 1300;
+}

@@ -1,0 +1,28 @@
+{
+  "name": "ashoka-ecommerce-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "Ashoka",
+    "admin-panel",
+    "backend"
+  ],
+  "scripts": {
+    "start:ashoka": "npm run dev -w Ashoka",
+    "start:admin": "npm run dev -w admin-panel",
+    "start:backend": "npm run dev -w backend",
+    "build:ashoka": "npm run build -w Ashoka",
+    "build:admin": "npm run build -w admin-panel",
+    "build:backend": "npm run build -w backend",
+    "build": "npm run build:ashoka && npm run build:admin",
+    "start:production": "npm start -w backend",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "^4.59.0"
+  }
+}

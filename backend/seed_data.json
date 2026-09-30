@@ -1,0 +1,283 @@
+{
+  "categories": [
+    {
+      "id": 4,
+      "category_name": "Besan & Gram Flour",
+      "slug": "besan-gram-flour",
+      "image": "1772191521891.png",
+      "status": true,
+      "createdAt": "2026-02-16T09:33:23.000Z",
+      "updatedAt": "2026-02-27T11:25:21.000Z"
+    }
+  ],
+  "products": [
+    {
+      "id": 7,
+      "name": "Premium Chana Besan 500g",
+      "description": "High-quality besan made from select chana dal, ideal for snacks and sweets.",
+      "sku": "BESAN-500",
+      "category_id": 4,
+      "customer_price": "60.00",
+      "wholesaler_price": "50.00",
+      "stock": 120,
+      "created_by": null,
+      "status": "active",
+      "created_at": "2026-02-16T09:33:23.000Z",
+      "updated_at": "2026-03-05T08:40:48.000Z",
+      "images": [
+        {
+          "id": 81,
+          "product_id": 7,
+          "image_url": "uploads/premium-besan.jpg",
+          "is_primary": true,
+          "sort_order": 0,
+          "created_at": "2026-03-05T11:19:35.000Z"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Premium Chana Besan 1kg",
+      "description": "High-quality besan made from select chana dal, ideal for snacks and sweets.",
+      "sku": "BESAN-1KG",
+      "category_id": 4,
+      "customer_price": "110.00",
+      "wholesaler_price": "95.00",
+      "stock": 96,
+      "created_by": null,
+      "status": "active",
+      "created_at": "2026-02-16T09:33:23.000Z",
+      "updated_at": "2026-03-05T08:40:59.000Z",
+      "images": [
+        {
+          "id": 82,
+          "product_id": 8,
+          "image_url": "uploads/premium-besan.jpg",
+          "is_primary": true,
+          "sort_order": 0,
+          "created_at": "2026-03-05T11:19:35.000Z"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Fine Gram Flour 500g",
+      "description": "High-quality besan made from select chana dal, ideal for snacks and sweets.",
+      "sku": "GRAM-500",
+      "category_id": 4,
+      "customer_price": "55.00",
+      "wholesaler_price": "46.00",
+      "stock": 84,
+      "created_by": null,
+      "status": "active",
+      "created_at": "2026-02-16T09:33:23.000Z",
+      "updated_at": "2026-02-19T12:35:10.000Z",
+      "images": [
+        {
+          "id": 58,
+          "product_id": 9,
+          "image_url": "uploads/fine-gram-flour.jpg",
+          "is_primary": true,
+          "sort_order": 0,
+          "created_at": "2026-03-05T05:22:46.000Z"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Fine Gram Flour 1kg",
+      "description": "High-quality besan made from select chana dal, ideal for snacks and sweets.",
+      "sku": "GRAM-1KG",
+      "category_id": 4,
+      "customer_price": "105.00",
+      "wholesaler_price": "90.00",
+      "stock": 81,
+      "created_by": null,
+      "status": "active",
+      "created_at": "2026-02-16T09:33:23.000Z",
+      "updated_at": "2026-02-18T12:50:11.000Z",
+      "images": [
+        {
+          "id": 59,
+          "product_id": 10,
+          "image_url": "uploads/fine-gram-flour.jpg",
+          "is_primary": true,
+          "sort_order": 0,
+          "created_at": "2026-03-05T05:22:46.000Z"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Roasted Besan 500g",
+      "description": "High-quality besan made from select chana dal, ideal for snacks and sweets.",
+      "sku": "RBESAN-500",
+      "category_id": 4,
+      "customer_price": "65.00",
+      "wholesaler_price": "54.00",
+      "stock": 80,
+      "created_by": null,
+      "status": "active",
+      "created_at": "2026-02-16T09:33:23.000Z",
+      "updated_at": "2026-02-16T09:47:00.000Z",
+      "images": [
+        {
+          "id": 60,
+          "product_id": 11,
+          "image_url": "uploads/roasted-besan.jpg",
+          "is_primary": true,
+          "sort_order": 0,
+          "created_at": "2026-03-05T05:22:46.000Z"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "Roasted Besan 1kg",
+      "description": "High-quality besan made from select chana dal, ideal for snacks and sweets.",
+      "sku": "RBESAN-1KG",
+      "category_id": 4,
+      "customer_price": "120.00",
+      "wholesaler_price": "100.00",
+      "stock": 70,
+      "created_by": null,
+      "status": "active",
+      "created_at": "2026-02-16T09:33:23.000Z",
+      "updated_at": "2026-02-16T09:33:23.000Z",
+      "images": [
+        {
+          "id": 61,
+          "product_id": 12,
+          "image_url": "uploads/roasted-besan.jpg",
+          "is_primary": true,
+          "sort_order": 0,
+          "created_at": "2026-03-05T05:22:46.000Z"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Superfine Besan for Sweets 500g",
+      "description": "High-quality besan made from select chana dal, ideal for snacks and sweets.",
+      "sku": "SBESAN-500",
+      "category_id": 4,
+      "customer_price": "75.00",
+      "wholesaler_price": "62.00",
+      "stock": 60,
+      "created_by": null,
+      "status": "active",
+      "created_at": "2026-02-16T09:33:23.000Z",
+      "updated_at": "2026-02-16T09:47:14.000Z",
+      "images": [
+        {
+          "id": 62,
+          "product_id": 13,
+          "image_url": "uploads/superfine-besan.jpg",
+          "is_primary": true,
+          "sort_order": 0,
+          "created_at": "2026-03-05T05:22:46.000Z"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Superfine Besan for Sweets 1kg",
+      "description": "High-quality besan made from select chana dal, ideal for snacks and sweets.",
+      "sku": "SBESAN-1KG",
+      "category_id": 4,
+      "customer_price": "135.00",
+      "wholesaler_price": "115.00",
+      "stock": 51,
+      "created_by": null,
+      "status": "active",
+      "created_at": "2026-02-16T09:33:23.000Z",
+      "updated_at": "2026-02-18T11:49:43.000Z",
+      "images": [
+        {
+          "id": 63,
+          "product_id": 14,
+          "image_url": "uploads/superfine-besan.jpg",
+          "is_primary": true,
+          "sort_order": 0,
+          "created_at": "2026-03-05T05:22:46.000Z"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Low Oil Absorb Besan 500g",
+      "description": "High-quality besan made from select chana dal, ideal for snacks and sweets.",
+      "sku": "LOBESAN-500",
+      "category_id": 4,
+      "customer_price": "70.00",
+      "wholesaler_price": "58.00",
+      "stock": 64,
+      "created_by": null,
+      "status": "active",
+      "created_at": "2026-02-16T09:33:23.000Z",
+      "updated_at": "2026-02-17T11:57:06.000Z",
+      "images": [
+        {
+          "id": 64,
+          "product_id": 15,
+          "image_url": "uploads/low-oil-besan.jpg",
+          "is_primary": true,
+          "sort_order": 0,
+          "created_at": "2026-03-05T05:22:46.000Z"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "name": "Low Oil Absorb Besan 1kg",
+      "description": "High-quality besan made from select chana dal, ideal for snacks and sweets.",
+      "sku": "LOBESAN-1KG",
+      "category_id": 4,
+      "customer_price": "130.00",
+      "wholesaler_price": "112.00",
+      "stock": 50,
+      "created_by": null,
+      "status": "active",
+      "created_at": "2026-02-16T09:33:23.000Z",
+      "updated_at": "2026-02-16T09:33:23.000Z",
+      "images": [
+        {
+          "id": 65,
+          "product_id": 16,
+          "image_url": "uploads/low-oil-besan.jpg",
+          "is_primary": true,
+          "sort_order": 0,
+          "created_at": "2026-03-05T05:22:46.000Z"
+        }
+      ]
+    }
+  ],
+  "adminUsers": [
+    {
+      "id": 8,
+      "name": "jayshriii kale",
+      "email": "jayashreedesignzfactory@gmail.com",
+      "password": "$2b$10$EQAjbvQZnSGdIi2.8k1pzeaLgEYUgtRMZrLFtshBEfRqWSzu5uxAq",
+      "phone": "7499714657",
+      "role": "admin",
+      "status": true,
+      "last_login": "2026-02-27T11:03:18.000Z",
+      "reset_token": null,
+      "reset_token_expiry": null,
+      "created_at": "2026-02-27T10:50:28.000Z"
+    },
+    {
+      "id": 9,
+      "name": "Vikrant Sandip Bhagat",
+      "email": "bhagatvikrant56@gmail.com",
+      "password": "$2b$10$dbUyYsXiE4D6OwusTT0Mgeg/WhBpQIQQTcM1VuVH76NjvChHV0E2e",
+      "phone": "8080437539",
+      "role": "admin",
+      "status": true,
+      "last_login": "2026-03-05T08:32:45.000Z",
+      "reset_token": null,
+      "reset_token_expiry": null,
+      "created_at": "2026-03-02T05:05:22.000Z"
+    }
+  ]
+}
