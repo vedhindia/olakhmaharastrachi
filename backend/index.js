@@ -30,6 +30,7 @@ const startHttpServer = () => {
   });
 };
 
+
 const initDbAndSeed = async () => {
   await sequelize.authenticate();
   console.log('Database connected successfully.');
