@@ -90,9 +90,9 @@ body {
 }
 
 .nav-link-custom.active {
-  background: linear-gradient(135deg, #0d6efd 0%, #0043a8 100%) !important;
+  background: rgb(170, 111, 101) !important;
   color: #fff !important;
-  box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3);
+  box-shadow: 0 4px 15px rgba(179, 12, 34, 0.342);
 }
 
 .logout-btn {
@@ -139,7 +139,7 @@ body {
 .avatar-circle {
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
+  background: linear-gradient(135deg, rgb(86, 22, 12) 0%, rgb(188, 59, 39) 100%);
   color: white;
   border-radius: 50%;
   display: flex;
@@ -172,4 +172,226 @@ body {
         margin-left: 300px; /* Sidebar width (280px) + gap */
         max-width: calc(100% - 320px); /* Adjust width to fit */
     }
+}
+
+/* ============================================
+   Admin Panel Button Color Overrides
+   All buttons -> rgb(86, 22, 12)
+   ============================================ */
+
+/* Solid Button Variants */
+.btn-primary,
+.btn-secondary,
+.btn-success,
+.btn-danger,
+.btn-warning,
+.btn-info,
+.btn-dark,
+.btn-light {
+  background-color: rgb(86, 22, 12) !important;
+  border-color: rgb(86, 22, 12) !important;
+  color: #fff !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active,
+.btn-primary.active,
+.btn-secondary:hover,
+.btn-secondary:focus,
+.btn-secondary:active,
+.btn-secondary.active,
+.btn-success:hover,
+.btn-success:focus,
+.btn-success:active,
+.btn-success.active,
+.btn-danger:hover,
+.btn-danger:focus,
+.btn-danger:active,
+.btn-danger.active,
+.btn-warning:hover,
+.btn-warning:focus,
+.btn-warning:active,
+.btn-warning.active,
+.btn-info:hover,
+.btn-info:focus,
+.btn-info:active,
+.btn-info.active,
+.btn-dark:hover,
+.btn-dark:focus,
+.btn-dark:active,
+.btn-dark.active,
+.btn-light:hover,
+.btn-light:focus,
+.btn-light:active,
+.btn-light.active,
+.show > .btn-primary.dropdown-toggle,
+.show > .btn-secondary.dropdown-toggle,
+.show > .btn-success.dropdown-toggle,
+.show > .btn-danger.dropdown-toggle,
+.show > .btn-warning.dropdown-toggle,
+.show > .btn-info.dropdown-toggle,
+.show > .btn-dark.dropdown-toggle,
+.show > .btn-light.dropdown-toggle {
+  background-color: rgb(70, 18, 10) !important;
+  border-color: rgb(70, 18, 10) !important;
+  color: #fff !important;
+}
+
+.btn.btn-check:checked + .btn,
+.btn:not(:disabled):not(.disabled).active,
+.btn:not(:disabled):not(.disabled):active,
+.show > .btn.dropdown-toggle {
+  background-color: rgb(86, 22, 12) !important;
+  border-color: rgb(86, 22, 12) !important;
+}
+
+.btn.btn-primary:disabled,
+.btn.btn-secondary:disabled,
+.btn.btn-success:disabled,
+.btn.btn-danger:disabled,
+.btn.btn-warning:disabled,
+.btn.btn-info:disabled,
+.btn.btn-dark:disabled,
+.btn.btn-light:disabled,
+.btn.btn-primary.disabled,
+.btn.btn-secondary.disabled,
+.btn.btn-success.disabled,
+.btn.btn-danger.disabled,
+.btn.btn-warning.disabled,
+.btn.btn-info.disabled,
+.btn.btn-dark.disabled,
+.btn.btn-light.disabled {
+  background-color: rgb(86, 22, 12) !important;
+  border-color: rgb(86, 22, 12) !important;
+  opacity: 0.65 !important;
+}
+
+/* Outline Button Variants */
+.btn-outline-primary,
+.btn-outline-secondary,
+.btn-outline-success,
+.btn-outline-danger,
+.btn-outline-warning,
+.btn-outline-info,
+.btn-outline-dark,
+.btn-outline-light {
+  color: rgb(86, 22, 12) !important;
+  border-color: rgb(86, 22, 12) !important;
+  background-color: transparent !important;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus,
+.btn-outline-primary:active,
+.btn-outline-primary.active,
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus,
+.btn-outline-secondary:active,
+.btn-outline-secondary.active,
+.btn-outline-success:hover,
+.btn-outline-success:focus,
+.btn-outline-success:active,
+.btn-outline-success.active,
+.btn-outline-danger:hover,
+.btn-outline-danger:focus,
+.btn-outline-danger:active,
+.btn-outline-danger.active,
+.btn-outline-warning:hover,
+.btn-outline-warning:focus,
+.btn-outline-warning:active,
+.btn-outline-warning.active,
+.btn-outline-info:hover,
+.btn-outline-info:focus,
+.btn-outline-info:active,
+.btn-outline-info.active,
+.btn-outline-dark:hover,
+.btn-outline-dark:focus,
+.btn-outline-dark:active,
+.btn-outline-dark.active,
+.btn-outline-light:hover,
+.btn-outline-light:focus,
+.btn-outline-light:active,
+.btn-outline-light.active,
+.show > .btn-outline-primary.dropdown-toggle,
+.show > .btn-outline-secondary.dropdown-toggle,
+.show > .btn-outline-success.dropdown-toggle,
+.show > .btn-outline-danger.dropdown-toggle,
+.show > .btn-outline-warning.dropdown-toggle,
+.show > .btn-outline-info.dropdown-toggle,
+.show > .btn-outline-dark.dropdown-toggle,
+.show > .btn-outline-light.dropdown-toggle {
+  background-color: rgb(86, 22, 12) !important;
+  border-color: rgb(86, 22, 12) !important;
+  color: #fff !important;
+}
+
+.btn-outline-primary:disabled,
+.btn-outline-secondary:disabled,
+.btn-outline-success:disabled,
+.btn-outline-danger:disabled,
+.btn-outline-warning:disabled,
+.btn-outline-info:disabled,
+.btn-outline-dark:disabled,
+.btn-outline-light:disabled,
+.btn-outline-primary.disabled,
+.btn-outline-secondary.disabled,
+.btn-outline-success.disabled,
+.btn-outline-danger.disabled,
+.btn-outline-warning.disabled,
+.btn-outline-info.disabled,
+.btn-outline-dark.disabled,
+.btn-outline-light.disabled {
+  color: rgb(86, 22, 12) !important;
+  background-color: transparent !important;
+  border-color: rgb(86, 22, 12) !important;
+  opacity: 0.65 !important;
+}
+
+/* Custom logout button hover */
+.logout-btn:hover {
+  background-color: rgb(86, 22, 12) !important;
+  border-color: rgb(86, 22, 12) !important;
+}
+
+/* Icon Buttons (circular buttons in Orders, etc.) */
+.btn-icon {
+  background-color: transparent !important;
+}
+
+.btn-icon:hover {
+  background-color: rgb(86, 22, 12) !important;
+  color: #fff !important;
+}
+
+/* Link styled as buttons */
+a.btn.btn-primary,
+a.btn.btn-secondary,
+a.btn.btn-success,
+a.btn.btn-danger,
+a.btn.btn-warning,
+a.btn.btn-info,
+a.btn.btn-dark,
+a.btn.btn-light {
+  background-color: rgb(86, 22, 12) !important;
+  border-color: rgb(86, 22, 12) !important;
+  color: #fff !important;
+}
+
+a.btn.btn-primary:hover,
+a.btn.btn-secondary:hover,
+a.btn.btn-success:hover,
+a.btn.btn-danger:hover,
+a.btn.btn-warning:hover,
+a.btn.btn-info:hover,
+a.btn.btn-dark:hover,
+a.btn.btn-light:hover {
+  background-color: rgb(70, 18, 10) !important;
+  border-color: rgb(70, 18, 10) !important;
+  color: #fff !important;
+}
+
+/* Close button in modals (only if used as a colored btn) */
+.btn-close {
+  /* keeping default close button appearance */
 }

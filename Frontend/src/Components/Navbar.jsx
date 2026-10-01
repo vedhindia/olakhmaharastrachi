@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Container, Nav, Navbar as BootstrapNavbar, NavDropdown, Button, Alert } from 'react-bootstrap';
 import { Phone, ChevronDown, Heart, ShoppingBag, Menu, Salad, User, Search } from 'lucide-react';
-import logo from '../assets/images/logo.png';
+import logo from '../assets/images/logoo.png';
 import './Navbar.css';
 
 const API_BASE = '/api';
@@ -333,14 +333,11 @@ const Navbar = () => {
         <Container className="d-flex justify-content-between align-items-center">
           <div className="top-bar-left d-flex align-items-center gap-2 small">
             <Phone size={14} />
-            <span>+91 99709 30890 | +91 88881 88194</span>
+            <span>+91 70572 86411</span>
           </div>
           <div className="top-bar-center  small d-none d-md-block">
-            CUSTOMER CARE:{' '}
-            <span className="fw-bold">+91 77410 90767</span>
-            {'  •  '}
             EMAIL:{' '}
-            <span className="fw-bold">ashokproducts.sales@gmail.com</span>
+            <span className="fw-bold">omksarsatpute2006@gmail.com</span>
           </div>
           <div className="top-bar-right d-flex gap-3 small">
            

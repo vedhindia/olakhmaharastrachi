@@ -3,7 +3,7 @@ import { Container, Row, Col } from 'react-bootstrap';
 import { Truck, RotateCcw, Headphones, ShieldCheck, MapPin, Phone, Facebook, Twitter, Linkedin, Instagram, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import './Footer.css';
-import logo from '../assets/images/logo.png';
+import logo from '../assets/images/logoo.png';
 
 const Footer = () => {
   return (
@@ -98,37 +98,25 @@ const Footer = () => {
               <div className="contact-block">
                 <h6 className="block-title">Contact</h6>
                 <div className="contact-line">
-                  GAT NO 1567, Near Shelar Crane Service Shelarvasti,
-                  Chikhali, Maharashtra – 411062
+                  KRV Capital Building, 2nd-floor
                 </div>
                 <div className="contact-item">
                   <div className="contact-icon"><MapPin size={16} /></div>
                   <div>
-                    Nano Spaces, ‘C’ Wing, Flat No. C-402, Near D.Y. Patil
-                    College, Ravet, Pune – 412101
+                    Shop No.205, Oppe Runwal Classic,
+                    Tapkir Chowk, Kaiwadi Main Raod, Maharashtra 411017
                   </div>
                 </div>
                 <div className="contact-item">
                   <div className="contact-icon"><Phone size={16} /></div>
                   <div>
-                    <a href="tel:+919970930890" className="text-decoration-none text-reset">+91 99709 30890</a> |{' '}
-                    <a href="tel:+918888188194" className="text-decoration-none text-reset">+91 88881 88194</a>
-                    <span className="muted">  Mon – Sat: 9 AM – 7 PM</span>
-                  </div>
-                </div>
-                <div className="contact-item">
-                  <div className="contact-icon"><Phone size={16} /></div>
-                  <div>
-                    Customer Care:{' '}
-                    <a href="tel:+917741090767" className="text-decoration-none text-reset">+91 77410 90767</a>
+                    <a href="tel:+917057286411" className="text-decoration-none text-reset">+91 70572 86411</a>
                   </div>
                 </div>
                 <div className="contact-item">
                   <div className="contact-icon"><Mail size={16} /></div>
                   <div>
-                    <a href="mailto:ashokproducts.sales@gmail.com" className="text-decoration-none text-reset">ashokproducts.sales@gmail.com</a>
-                    <br />
-                    <a href="mailto:jaydeepthakur55@gmail.com" className="text-decoration-none text-reset">jaydeepthakur55@gmail.com</a>
+                    <a href="mailto:omksarsatpute2006@gmail.com" className="text-decoration-none text-reset">omksarsatpute2006@gmail.com</a>
                   </div>
                 </div>
               </div>

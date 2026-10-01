@@ -176,29 +176,24 @@ const Contact = () => {
                   <div className="contact-info-line">
                     <MapPin size={18} />
                     <span>
-                      GAT NO 1567, Near Shelar Crane Service Shelarvasti,
-                      Chikhali, Maharashtra – 411062
+                      KRV Capital Building, 2nd-floor
                     </span>
                   </div>
                   <div className="contact-info-line">
                     <MapPin size={18} />
                     <span>
-                      Nano Spaces, ‘C’ Wing, Flat No. C-402, Near D.Y. Patil
-                      College, Ravet, Pune – 412101
+                      Shop No.205, Oppe Runwal Classic,
+                      Tapkir Chowk, Kaiwadi Main Raod, Maharashtra 411017
                     </span>
                   </div>
                   <div className="contact-info-line">
                     <Phone size={18} />
-                    <span>Contact: +91 99709 30890 | +91 88881 88194</span>
-                  </div>
-                  <div className="contact-info-line">
-                    <Phone size={18} />
-                    <span>Customer Care: +91 77410 90767</span>
+                    <span>Mobile: +91 70572 86411</span>
                   </div>
                   <div className="contact-info-line">
                     <Mail size={18} />
                     <span>
-                      ashokproducts.sales@gmail.com, jaydeepthakur55@gmail.com
+                      omksarsatpute2006@gmail.com
                     </span>
                   </div>
                   <div className="contact-info-line">

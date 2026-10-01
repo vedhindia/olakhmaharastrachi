@@ -26,12 +26,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .category-nav {
-  background-color: var(--brand-primary-soft) !important;
+  background-color: rgb(86, 22, 12) !important;
   border-color: var(--brand-primary-soft-border) !important;
-  color: var(--brand-primary) !important;
+  color: white !important;
 }
 .category-nav:hover {
-  background-color: var(--brand-primary-soft-border) !important;
+  background-color: rgb(165, 89, 78) !important;
   color: var(--brand-primary-dark) !important;
   border-color: var(--brand-primary-soft-border) !important;
 }

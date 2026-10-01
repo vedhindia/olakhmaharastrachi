@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, ShoppingBag, Layers, LogOut, KeyRound, Settings, User, Users, Briefcase, ChevronDown, ChevronRight, MessageSquare, ShoppingCart, Tag, Mail, RotateCcw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Nav, Collapse } from 'react-bootstrap';
-import logo from '../assets/logo.png';
+import logo from '../assets/logoo.png';
 import api from '../services/api';
 
 const INQUIRIES_LAST_SEEN_KEY = 'admin:lastSeen:inquiries';

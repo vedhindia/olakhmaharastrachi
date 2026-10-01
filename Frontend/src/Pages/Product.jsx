@@ -465,7 +465,12 @@ const Product = () => {
                   <div className="product-card text-center h-100">
                     <div className="product-img-wrapper position-relative mb-1">
                       {product.discount && (
-                        <span className="discount-badge">{product.discount}</span>
+                        <span
+                          className="discount-badge"
+                          style={{ cssText: 'background-color: rgb(22, 43, 0) !important; color: white !important; border: none !important;' }}
+                        >
+                          {product.discount}
+                        </span>
                       )}
                       <img
                         src={product.image}
@@ -522,13 +527,22 @@ const Product = () => {
                           ₹{product.price.toFixed(2)}
                         </span>
                       </div>
-                      <div className="mt-3 d-flex justify-content-center gap-2">
+                      <div className="mt-3 d-flex" style={{ gap: '0.25rem' }}>
                         <button
                           type="button"
-                          className="btn btn-success btn-sm"
+                          className="btn btn-sm flex-fill d-flex align-items-center justify-content-center border-0"
+                          style={{ backgroundColor: 'rgb(86, 22, 12)', color: 'white', paddingTop: 0, paddingBottom: 0, paddingLeft: '0.25rem', paddingRight: '0.25rem', fontSize: 'clamp(0.5rem, 1.5vw, 0.7rem)', height: '28px', lineHeight: '1', whiteSpace: 'nowrap', textAlign: 'center' }}
+                          onClick={(event) => handleAddToCart(product.id, event)}
+                        >
+                          ADD TO CART
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm flex-fill d-flex align-items-center justify-content-center border-0"
+                          style={{ backgroundColor: 'rgb(86, 22, 12)', color: 'white', paddingTop: 0, paddingBottom: 0, paddingLeft: '0.25rem', paddingRight: '0.25rem', fontSize: 'clamp(0.5rem, 1.5vw, 0.7rem)', height: '28px', lineHeight: '1', whiteSpace: 'nowrap', textAlign: 'center' }}
                           onClick={(event) => handleBuyNow(product.id, event)}
                         >
-                          Buy Now
+                          BUY NOW
                         </button>
                       </div>
                     </div>

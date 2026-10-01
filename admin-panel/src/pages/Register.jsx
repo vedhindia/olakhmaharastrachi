@@ -206,7 +206,7 @@ const Register = () => {
                     className="w-100 mb-2 mb-sm-3 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2"
                     style={{ 
                       borderRadius: '8px', 
-                      background: 'linear-gradient(to right, #2563eb, #3b82f6)', 
+                      background: 'rgb(86, 22, 12)', 
                       border: 'none',
                       fontSize: '0.95rem',
                       minHeight: '44px'

@@ -3,9 +3,9 @@ import { Container, Row, Col, Button, Carousel, Nav, Alert, Spinner } from 'reac
 import { ChevronRight, ChevronLeft, Wheat, Box, Container as PackageIcon, Layers, ShoppingBag, Star, Heart, Eye, Leaf, Award, ShieldCheck, Quote } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import productImg from '../assets/images/product 5.png';
-import banner1 from '../assets/images/ashoka banners 1.jpg';
-import banner2 from '../assets/images/ashoka  banners 2.jpg';
-import banner3 from '../assets/images/ashoka  banners 3.jpg';
+import banner1 from '../assets/images/banner 1.jpg';
+import banner2 from '../assets/images/banner 2.jpg';
+import banner3 from '../assets/images/banner 3.jpg';
 import Footer from '../Components/Footer';
 import './Home.css';
 import bg from '../assets/images/bg.png';
@@ -792,7 +792,10 @@ const Home = () => {
                           </button>
                         </div>
                         {product.badge && (
-                          <span className={`product-badge ${product.badgeType}`}>
+                          <span
+                            className={`product-badge ${product.badgeType}`}
+                            style={{ cssText: 'background-color: rgb(22, 43, 0) !important; color: white !important; border: none !important;' }}
+                          >
                             {product.badge}
                           </span>
                         )}
@@ -817,10 +820,19 @@ const Home = () => {
                             <>₹{product.price.toFixed(2)}</>
                           )}
                         </p>
-                        <div className="mt-2">
+                        <div className="mt-2 d-flex" style={{ gap: '0.25rem' }}>
                           <Button
-                            variant="success"
                             size="sm"
+                            className="flex-fill d-flex align-items-center justify-content-center border-0"
+                            style={{ backgroundColor: 'rgb(86, 22, 12)', color: 'white', paddingTop: 0, paddingBottom: 0, paddingLeft: '0.25rem', paddingRight: '0.25rem', fontSize: 'clamp(0.5rem, 1.5vw, 0.7rem)', height: '28px', lineHeight: '1', whiteSpace: 'nowrap', textAlign: 'center' }}
+                            onClick={(event) => handleAddToCart(product.id, event)}
+                          >
+                            ADD TO CART
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="flex-fill d-flex align-items-center justify-content-center border-0"
+                            style={{ backgroundColor: 'rgb(86, 22, 12)', color: 'white', paddingTop: 0, paddingBottom: 0, paddingLeft: '0.25rem', paddingRight: '0.25rem', fontSize: 'clamp(0.5rem, 1.5vw, 0.7rem)', height: '28px', lineHeight: '1', whiteSpace: 'nowrap', textAlign: 'center' }}
                             onClick={(event) => handleBuyNow(product.id, event)}
                           >
                             BUY NOW
@@ -873,7 +885,7 @@ const Home = () => {
       <section className="why-choose-section py-5">
         <Container>
           <div className="text-center mb-4">
-            <span className="why-badge">Why Choose Ashoka</span>
+            <span className="why-badge">Why Choose Us</span>
             <h2 className="why-title mt-2 mb-5">Trusted Quality. Natural Goodness.</h2>
           </div>
           <Row className="g-4">

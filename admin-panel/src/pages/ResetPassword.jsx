@@ -136,7 +136,7 @@ const ResetPassword = () => {
                     variant="primary" 
                     type="submit" 
                     className="w-100 mb-3 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2"
-                    style={{ borderRadius: '8px', background: 'linear-gradient(to right, #2563eb, #3b82f6)', border: 'none' }}
+                    style={{ borderRadius: '8px', background: 'rgb(86, 22, 12)', border: 'none' }}
                     disabled={loading}
                   >
                     {loading ? <Spinner animation="border" size="sm" /> : <>Set New Password <ArrowRight size={18} /></>}

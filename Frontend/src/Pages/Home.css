@@ -101,7 +101,7 @@ background: linear-gradient(135deg, #e7c249 0%, #f0ee80 100%);
 /* Category Section Styles */
 .category-section {
   padding: 60px 0;
-  background: #8cc63f7d;
+  background: rgb(247, 233, 225);
 }
 
 .category-section .position-relative {
@@ -374,7 +374,7 @@ background: linear-gradient(135deg, #e7c249 0%, #f0ee80 100%);
 .section-title {
   font-size: 36px;
   font-weight: 800;
-  color: #111;
+  color: rgb(22, 43, 0)!important;
 }
 
 .product-filters .nav-link {
@@ -867,7 +867,7 @@ background: linear-gradient(135deg, #e7c249 0%, #f0ee80 100%);
 .testi-title {
   font-size: 36px;
   font-weight: 800;
-  color: #111;
+  color: rgb(22, 43, 0);
 }
 
 .testimonial-card {
