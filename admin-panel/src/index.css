@@ -356,11 +356,12 @@ body {
 
 /* Icon Buttons (circular buttons in Orders, etc.) */
 .btn-icon {
-  background-color: transparent !important;
+  background-color: rgb(86, 22, 12) !important;
+  color: #fff !important;
 }
 
 .btn-icon:hover {
-  background-color: rgb(86, 22, 12) !important;
+  background-color: rgb(70, 18, 10) !important;
   color: #fff !important;
 }
 

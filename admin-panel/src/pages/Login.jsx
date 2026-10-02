@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Container, Card, Form, Button, InputGroup, Spinner } from 'react-bootstrap';
 import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
-import logo from '../assets/logo.png';
+import logo from '../assets/logoo.png';
 
 const Login = () => {
   const [email, setEmail] = useState('');

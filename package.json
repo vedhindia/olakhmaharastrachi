@@ -3,15 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "Ashoka",
+    "Frontend",
     "admin-panel",
     "backend"
   ],
   "scripts": {
-    "start:ashoka": "npm run dev -w Ashoka",
+    "start:ashoka": "npm run dev -w Frontend",
     "start:admin": "npm run dev -w admin-panel",
     "start:backend": "npm run dev -w backend",
-    "build:ashoka": "npm run build -w Ashoka",
+    "build:ashoka": "npm run build -w Frontend",
     "build:admin": "npm run build -w admin-panel",
     "build:backend": "npm run build -w backend",
     "build": "npm run build:ashoka && npm run build:admin",

@@ -1,7 +1,7 @@
 import React from "react";
 import { Container, Row, Col } from "react-bootstrap";
 import "./About.css";
-import productImg from "../assets/images/aboutus.jpg";
+import productImg from "../assets/images/aboutus.png";
 import aboutHero from "../assets/images/1920X500.jpg";
 import bg from "../assets/images/bg.png";
 import fssaiLogo from "../assets/images/fassi logo.png";
