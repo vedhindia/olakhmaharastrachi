@@ -3,7 +3,7 @@
 }
 
 .contact-hero-section {
-  background-image: url('https://images.pexels.com/photos/259588/pexels-photo-259588.jpeg?auto=compress&cs=tinysrgb&w=1200');
+  background-image: url('../assets/images/contactimg.jpg');
   background-size: cover;
   background-position: center;
   padding: 70px 0;
