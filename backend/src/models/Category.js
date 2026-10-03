@@ -19,6 +19,12 @@ const Category = sequelize.define('Category', {
     type: DataTypes.STRING(255),
     allowNull: true,
   },
+  variant_type: {
+    type: DataTypes.ENUM('none', 'weight', 'size'),
+    defaultValue: 'none',
+    allowNull: false,
+    comment: 'none = standard product, weight = 100g/250g/1kg etc, size = S/M/L/XL etc',
+  },
   status: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,

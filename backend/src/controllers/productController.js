@@ -1,4 +1,4 @@
-const { Product, ProductImage, Category } = require('../models');
+const { Product, ProductImage, Category, ProductVariant } = require('../models');
 const sequelize = require('../config/database');
 const { QueryTypes } = require('sequelize');
 
@@ -71,6 +71,113 @@ const safeUnlinkImage = (imageUrl) => {
     }
   }
   return false;
+};
+
+const parseVariantsJson = (raw) => {
+  if (!raw) return null;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const normalizeVariant = (raw, index) => {
+  if (!raw || typeof raw !== 'object') return null;
+  const variant_value = typeof raw.variant_value === 'string' ? raw.variant_value.trim() : String(raw.variant_value || '').trim();
+  if (!variant_value) return null;
+  const skuRaw = typeof raw.sku === 'string' ? raw.sku.trim() : (raw.sku ? String(raw.sku) : '');
+  const sku = skuRaw === '' ? null : skuRaw;
+  let customer_price = null;
+  if (raw.customer_price !== undefined && raw.customer_price !== null && raw.customer_price !== '') {
+    const p = parseFloat(raw.customer_price);
+    if (!Number.isNaN(p)) customer_price = p;
+  }
+  let wholesaler_price = null;
+  if (raw.wholesaler_price !== undefined && raw.wholesaler_price !== null && raw.wholesaler_price !== '') {
+    const p = parseFloat(raw.wholesaler_price);
+    if (!Number.isNaN(p)) wholesaler_price = p;
+  }
+  let stock = 0;
+  if (raw.stock !== undefined && raw.stock !== null && raw.stock !== '') {
+    const s = parseInt(raw.stock, 10);
+    stock = Number.isNaN(s) ? 0 : Math.max(0, s);
+  }
+  const status = (raw.status === 'true' || raw.status === true || raw.status === 'active') ? 'active' : 'inactive';
+  const sort_order = typeof raw.sort_order === 'number' ? raw.sort_order : (Number.isFinite(Number(raw.sort_order)) ? Number(raw.sort_order) : index);
+  const id = raw.id ? (Number.isNaN(Number(raw.id)) ? null : Number(raw.id)) : null;
+  return {
+    id,
+    variant_value,
+    sku,
+    customer_price,
+    wholesaler_price,
+    stock,
+    status,
+    sort_order,
+  };
+};
+
+const createOrReplaceVariants = async (productId, rawVariants) => {
+  const parsed = parseVariantsJson(rawVariants);
+  if (!parsed) return { created: 0, replaced: false };
+  const normalized = parsed.map((v, i) => normalizeVariant(v, i)).filter(Boolean);
+  await ProductVariant.destroy({ where: { product_id: productId } });
+  if (normalized.length === 0) return { created: 0, replaced: true };
+  const rows = normalized.map((v) => ({
+    product_id: productId,
+    variant_value: v.variant_value,
+    sku: v.sku,
+    customer_price: v.customer_price,
+    wholesaler_price: v.wholesaler_price,
+    stock: v.stock,
+    status: v.status,
+    sort_order: v.sort_order,
+  }));
+  await ProductVariant.bulkCreate(rows);
+  return { created: rows.length, replaced: true };
+};
+
+const attachVariantsAndEffectivePricing = (productJson) => {
+  if (!productJson) return productJson;
+  const variants = Array.isArray(productJson.variants) ? productJson.variants : [];
+  const hasVariants = variants.length > 0;
+  productJson.has_variants = hasVariants;
+  if (!hasVariants) {
+    productJson.effective_stock = productJson.stock ?? 0;
+    productJson.min_customer_price = productJson.customer_price ?? null;
+    productJson.max_customer_price = productJson.customer_price ?? null;
+    productJson.min_wholesaler_price = productJson.wholesaler_price ?? null;
+    productJson.max_wholesaler_price = productJson.wholesaler_price ?? null;
+    return productJson;
+  }
+  let minC = null, maxC = null, minW = null, maxW = null;
+  let totalStock = 0;
+  for (const v of variants) {
+    if (v.status === 'inactive') continue;
+    totalStock += Number(v.stock || 0);
+    const cp = v.customer_price ?? productJson.customer_price ?? null;
+    const wp = v.wholesaler_price ?? productJson.wholesaler_price ?? null;
+    if (cp !== null && cp !== undefined) {
+      if (minC === null || cp < minC) minC = cp;
+      if (maxC === null || cp > maxC) maxC = cp;
+    }
+    if (wp !== null && wp !== undefined) {
+      if (minW === null || wp < minW) minW = wp;
+      if (maxW === null || wp > maxW) maxW = wp;
+    }
+  }
+  productJson.effective_stock = totalStock;
+  productJson.min_customer_price = minC;
+  productJson.max_customer_price = maxC;
+  productJson.min_wholesaler_price = minW;
+  productJson.max_wholesaler_price = maxW;
+  return productJson;
 };
 
 exports.createProduct = async (req, res) => {
@@ -171,12 +278,28 @@ exports.createProduct = async (req, res) => {
         await Promise.allSettled(tasks);
     }
 
-    // Reload product to include images (best effort)
+    // Handle product variants (from multipart form as JSON string under "variants" field)
+    try {
+      const rawVariants =
+        (req.body && req.body.variants) ||
+        (req.body && req.body.variants_json) ||
+        null;
+      await createOrReplaceVariants(product.id, rawVariants);
+    } catch (variantErr) {
+      console.error('Variant creation failed (non-fatal):', variantErr);
+    }
+
+    // Reload product to include images + variants (best effort)
     try {
       const createdProduct = await Product.findByPk(product.id, {
-          include: [{ model: ProductImage, as: 'images' }]
+          include: [
+            { model: ProductImage, as: 'images' },
+            { model: ProductVariant, as: 'variants', order: [['sort_order', 'ASC'], ['id', 'ASC']] }
+          ]
       });
-      return res.status(201).json(createdProduct || product);
+      const payload = createdProduct ? createdProduct.toJSON() : product;
+      attachVariantsAndEffectivePricing(payload);
+      return res.status(201).json(payload);
     } catch (e) {
       console.error('Post-create reload failed:', e);
       return res.status(201).json(product);
@@ -309,21 +432,66 @@ exports.getAllProducts = async (req, res) => {
       } catch {
         rows.forEach(p => { p.images = []; });
       }
+
+      try {
+        const varRows = await sequelize.query(
+          `
+          SELECT id, product_id, variant_value, sku, customer_price, wholesaler_price, stock, sort_order, status
+          FROM product_variants
+          WHERE product_id IN (:ids)
+          ORDER BY sort_order ASC, id ASC
+          `,
+          { replacements: { ids }, type: QueryTypes.SELECT }
+        );
+        const varsByPid = varRows.reduce((acc, r) => {
+          const arr = acc[r.product_id] || [];
+          arr.push({
+            id: r.id,
+            product_id: r.product_id,
+            variant_value: r.variant_value,
+            sku: r.sku,
+            customer_price: r.customer_price,
+            wholesaler_price: r.wholesaler_price,
+            stock: Number(r.stock ?? 0),
+            sort_order: r.sort_order ?? 0,
+            status: r.status || 'active',
+          });
+          acc[r.product_id] = arr;
+          return acc;
+        }, {});
+        rows.forEach(p => {
+          p.variants = varsByPid[p.id] || [];
+          attachVariantsAndEffectivePricing(p);
+        });
+      } catch {
+        rows.forEach(p => {
+          p.variants = [];
+          attachVariantsAndEffectivePricing(p);
+        });
+      }
+
     } else {
-      rows.forEach(p => { p.images = []; });
+      rows.forEach(p => {
+        p.images = [];
+        p.variants = [];
+        attachVariantsAndEffectivePricing(p);
+      });
     }
 
     // Preserve previous UI contract by providing legacy-friendly fields
     const products = rows.map(p => {
       const images = Array.isArray(p.images) ? p.images : [];
       const primary = images.find(i => i.is_primary) || images[0] || null;
+      const variants = Array.isArray(p.variants) ? p.variants : [];
       return {
         ...p,
         product_name: p.name,            // legacy alias
-        stock_quantity: p.stock,         // legacy alias
+        stock_quantity: p.effective_stock ?? p.stock,         // legacy alias (now = effective stock across variants)
         main_image: primary ? primary.image_url : null, // used by table thumbnail
         mrp_price: null,                 // not in schema; keep key for UI layout
         selling_price: null,             // not in schema; keep key for UI layout
+        has_variants: variants.length > 0,
+        variants,
       };
     });
 
@@ -402,6 +570,7 @@ exports.getProductById = async (req, res) => {
         c.id AS cat_id,
         c.category_name,
         c.slug AS category_slug,
+        c.variant_type,
         c.status AS category_status,
         c.created_at AS category_created_at,
         c.updated_at AS category_updated_at
@@ -453,6 +622,32 @@ exports.getProductById = async (req, res) => {
       });
     }
 
+    const varSql = `
+      SELECT id, product_id, variant_value, sku, customer_price, wholesaler_price, stock, sort_order, status, created_at, updated_at
+      FROM product_variants
+      WHERE product_id = :id
+      ORDER BY sort_order ASC, id ASC
+    `;
+    let varRows = [];
+    try {
+      varRows = await sequelize.query(varSql, { replacements: { id }, type: QueryTypes.SELECT });
+    } catch {
+      varRows = [];
+    }
+    const variants = varRows.map(v => ({
+      id: v.id,
+      product_id: v.product_id,
+      variant_value: v.variant_value,
+      sku: v.sku,
+      customer_price: v.customer_price,
+      wholesaler_price: v.wholesaler_price,
+      stock: Number(v.stock ?? 0),
+      sort_order: v.sort_order ?? 0,
+      status: v.status || 'active',
+      created_at: v.created_at,
+      updated_at: v.updated_at,
+    }));
+
     const payload = {
       id: r.id,
       category_id: r.category_id,
@@ -475,13 +670,16 @@ exports.getProductById = async (req, res) => {
             id: r.cat_id,
             category_name: r.category_name,
             slug: r.category_slug,
+            variant_type: r.variant_type || 'none',
             status: r.category_status,
             createdAt: r.category_created_at,
             updatedAt: r.category_updated_at,
           }
         : null,
       images,
+      variants,
     };
+    attachVariantsAndEffectivePricing(payload);
     res.json(payload);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -564,7 +762,7 @@ exports.getAllProductsPriced = async (req, res) => {
           arr.push({
             id: img.id,
             product_id: img.product_id,
-          image_url: normalizeStoredImageUrl(img.image_url),
+            image_url: normalizeStoredImageUrl(img.image_url),
             is_primary: !!img.is_primary,
             sort_order: img.sort_order ?? 0,
           });
@@ -576,16 +774,57 @@ exports.getAllProductsPriced = async (req, res) => {
       }
     }
 
+    let variantsByProduct = {};
+    if (ids.length) {
+      try {
+        const vSql = `
+          SELECT id, product_id, variant_value, sku, customer_price, wholesaler_price, stock, sort_order, status
+          FROM product_variants
+          WHERE product_id IN (:ids)
+          ORDER BY sort_order ASC, id ASC
+        `;
+        const vRows = await sequelize.query(vSql, { replacements: { ids }, type: QueryTypes.SELECT });
+        variantsByProduct = vRows.reduce((acc, v) => {
+          const arr = acc[v.product_id] || [];
+          arr.push({
+            id: v.id,
+            product_id: v.product_id,
+            variant_value: v.variant_value,
+            sku: v.sku,
+            customer_price: v.customer_price,
+            wholesaler_price: v.wholesaler_price,
+            stock: Number(v.stock ?? 0),
+            sort_order: v.sort_order ?? 0,
+            status: v.status || 'active',
+          });
+          acc[v.product_id] = arr;
+          return acc;
+        }, {});
+      } catch {
+        variantsByProduct = {};
+      }
+    }
+
     const products = rows.map(r => {
       const retail = r.customer_price ?? r.selling_price ?? r.mrp_price ?? 0;
       const wholesale = r.wholesaler_price ?? r.doctor_price ?? 0;
-      const effective_price = userType === 'wholesaler'
-        ? (Number(wholesale) || Number(retail) || 0)
-        : (Number(retail) || 0);
-      const price_type = userType === 'wholesaler' ? 'wholesaler' : 'customer';
+      const variants = variantsByProduct[r.id] || [];
       const images = imagesByProduct[r.id] || (r.main_image ? [{
         id: null, product_id: r.id, image_url: r.main_image, is_primary: true, sort_order: 0,
       }] : []);
+      const temp = {
+        variants,
+        customer_price: retail,
+        wholesaler_price: wholesale,
+        stock: r.stock ?? r.stock_quantity ?? 0,
+      };
+      attachVariantsAndEffectivePricing(temp);
+      const effectiveRetail = temp.min_customer_price ?? retail;
+      const effectiveWholesale = temp.min_wholesaler_price ?? wholesale;
+      const effective_price = userType === 'wholesaler'
+        ? (Number(effectiveWholesale) || Number(effectiveRetail) || 0)
+        : (Number(effectiveRetail) || 0);
+      const price_type = userType === 'wholesaler' ? 'wholesaler' : 'customer';
       return {
         id: r.id,
         category_id: r.category_id,
@@ -598,8 +837,16 @@ exports.getAllProductsPriced = async (req, res) => {
         doctor_price: r.doctor_price ?? null,
         main_image: r.main_image || null,
         status: r.status,
-        category: r.cat_id ? { id: r.cat_id, category_name: r.category_name, slug: r.category_slug, status: r.category_status } : null,
+        stock: r.stock ?? r.stock_quantity ?? 0,
+        category: r.cat_id ? { id: r.cat_id, category_name: r.category_name, slug: r.category_slug, variant_type: r.variant_type || 'none', status: r.category_status } : null,
         images,
+        variants,
+        has_variants: variants.length > 0,
+        min_customer_price: temp.min_customer_price,
+        max_customer_price: temp.max_customer_price,
+        min_wholesaler_price: temp.min_wholesaler_price,
+        max_wholesaler_price: temp.max_wholesaler_price,
+        effective_stock: temp.effective_stock,
         effective_price,
         price_type,
       };
@@ -621,7 +868,8 @@ exports.getProductByIdPriced = async (req, res) => {
     const product = await Product.findByPk(req.params.id, {
       include: [
         { model: Category, as: 'category' },
-        { model: ProductImage, as: 'images' }
+        { model: ProductImage, as: 'images' },
+        { model: ProductVariant, as: 'variants', order: [['sort_order', 'ASC'], ['id', 'ASC']] }
       ]
     });
     if (!product) {
@@ -634,8 +882,11 @@ exports.getProductByIdPriced = async (req, res) => {
         image_url: normalizeStoredImageUrl(img.image_url),
       }));
     }
+    attachVariantsAndEffectivePricing(data);
     const userType = req.userType;
-    const effective_price = userType === 'wholesaler' ? data.wholesaler_price : data.customer_price;
+    const retailMin = data.min_customer_price ?? data.customer_price;
+    const wholeMin = data.min_wholesaler_price ?? data.wholesaler_price;
+    const effective_price = userType === 'wholesaler' ? wholeMin : retailMin;
     const price_type = userType === 'wholesaler' ? 'wholesaler' : 'customer';
     res.json({ ...data, effective_price, price_type });
   } catch (error) {
@@ -761,9 +1012,25 @@ exports.updateProduct = async (req, res) => {
         await Promise.all(imagePromises);
     }
 
-    // Return updated product with images
+    // Handle product variants replace (if "variants" or "variants_json" JSON string is provided)
+    try {
+      const rawVariants =
+        (req.body && req.body.variants) ||
+        (req.body && req.body.variants_json) ||
+        null;
+      if (rawVariants !== null && rawVariants !== undefined) {
+        await createOrReplaceVariants(product.id, rawVariants);
+      }
+    } catch (variantErr) {
+      console.error('Variant update failed (non-fatal):', variantErr);
+    }
+
+    // Return updated product with images + variants
     const updatedProduct = await Product.findByPk(product.id, {
-        include: [{ model: ProductImage, as: 'images' }]
+        include: [
+          { model: ProductImage, as: 'images' },
+          { model: ProductVariant, as: 'variants', order: [['sort_order', 'ASC'], ['id', 'ASC']] }
+        ]
     });
 
     const payload = updatedProduct ? updatedProduct.toJSON() : updatedProduct;
@@ -773,6 +1040,7 @@ exports.updateProduct = async (req, res) => {
         image_url: normalizeStoredImageUrl(img.image_url),
       }));
     }
+    attachVariantsAndEffectivePricing(payload);
     res.json(payload);
   } catch (error) {
     console.error('Error in updateProduct:', error);

@@ -1,4 +1,4 @@
-const { Order, OrderItem, Cart, CartItem, Product, ProductImage, User, Wholesaler, Coupon, Shipment } = require('../models');
+const { Order, OrderItem, Cart, CartItem, Product, ProductVariant, ProductImage, User, Wholesaler, Coupon, Shipment } = require('../models');
 const sequelize = require('../config/database');
 const { Op } = require('sequelize');
 const nodemailer = require('nodemailer');
@@ -181,12 +181,18 @@ const buildInvoiceHtml = ({ order, includePrintScript }) => {
       const imageMarkup = imageUrl
         ? `<img src="${imageUrl}" alt="${it.product_name}" style="width:40px;height:40px;object-fit:cover;margin-right:8px;border-radius:4px;border:1px solid #eee;" />`
         : '';
+      const variantLabel = it.variant_name
+        ? `<div style="font-size:12px;color:#6b7280;margin-top:2px;">${it.variant_name}</div>`
+        : '';
       return `
       <tr>
         <td style="padding:8px;border-bottom:1px solid #eee;">
           <div style="display:flex;align-items:center;gap:8px;">
             ${imageMarkup}
-            <span>${it.product_name}</span>
+            <div>
+              <div>${it.product_name}</div>
+              ${variantLabel}
+            </div>
           </div>
         </td>
         <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">${it.quantity}</td>
@@ -407,8 +413,17 @@ const buildInvoicePdfBuffer = ({ order }) =>
         const qty = Number(it.quantity || 0);
         const lineTotal = price * qty;
         const name = String(it.product_name || '-');
+        const hasVariant = it.variant_name && String(it.variant_name).trim() !== '';
 
+        doc.fontSize(10).fillColor('#111827');
         doc.text(name, colProduct, y, { width: pageWidth * 0.55 });
+        let nextY = y;
+        if (hasVariant) {
+          doc.fontSize(8).fillColor('#6b7280');
+          doc.text(String(it.variant_name), colProduct + 4, y + 11, { width: pageWidth * 0.55 - 4 });
+          nextY += 4;
+        }
+        doc.fontSize(10).fillColor('#111827');
         doc.text(String(qty || 0), colQty, y, { width: pageWidth * 0.15, align: 'center' });
         doc.text(formatMoney(price), colPrice, y, { width: pageWidth * 0.15, align: 'right' });
         doc.text(formatMoney(lineTotal), colTotal, y, {
@@ -416,7 +431,7 @@ const buildInvoicePdfBuffer = ({ order }) =>
           align: 'right',
         });
 
-        y += 18;
+        y = nextY + 18;
         doc.moveTo(leftX, y - 4).lineTo(rightX, y - 4).strokeColor('#f3f4f6').stroke();
       });
 
@@ -518,9 +533,15 @@ const sendOrderConfirmationEmail = async (orderId) => {
       .map((it) => {
         const price = Number(it.price || 0);
         const lineTotal = price * it.quantity;
+        const variantLabel = it.variant_name
+          ? `<div style="font-size:11px;color:#6b7280;margin-top:2px;">${it.variant_name}</div>`
+          : '';
         return `
           <tr>
-            <td style="padding:6px 8px;border-bottom:1px solid #eee;">${it.product_name}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;">
+              <div>${it.product_name}</div>
+              ${variantLabel}
+            </td>
             <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;">${it.quantity}</td>
             <td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;">₹${price.toFixed(
               2,
@@ -808,14 +829,38 @@ exports.placeOrder = async (req, res) => {
     const orderItemsData = [];
 
     for (const item of cart.items) {
-      if (item.product.stock < item.quantity) {
-        await t.rollback();
-        return res.status(400).json({
-          message: `Insufficient stock for product: ${item.product.name}. Available: ${item.product.stock}`
-        });
+      const hasVariant = item.variant_id && Number(item.variant_id) > 0;
+      let variantForItem = null;
+      if (hasVariant) {
+        variantForItem = await ProductVariant.findByPk(item.variant_id, { transaction: t, lock: t.LOCK.UPDATE });
+        if (!variantForItem) {
+          await t.rollback();
+          return res.status(400).json({
+            message: `Variant not found for product: ${item.product.name}. Please refresh cart.`
+          });
+        }
+        if (variantForItem.status === 'inactive') {
+          await t.rollback();
+          return res.status(400).json({
+            message: `Variant ${item.variant_name || ''} for product ${item.product.name} is no longer available.`
+          });
+        }
+        if (variantForItem.stock < item.quantity) {
+          await t.rollback();
+          return res.status(400).json({
+            message: `Insufficient stock for ${item.product.name} (${item.variant_name || 'variant'}). Available: ${variantForItem.stock}`
+          });
+        }
+        await variantForItem.decrement('stock', { by: item.quantity, transaction: t });
+      } else {
+        if (item.product.stock < item.quantity) {
+          await t.rollback();
+          return res.status(400).json({
+            message: `Insufficient stock for product: ${item.product.name}. Available: ${item.product.stock}`
+          });
+        }
+        await item.product.decrement('stock', { by: item.quantity, transaction: t });
       }
-
-      await item.product.decrement('stock', { by: item.quantity, transaction: t });
 
       const itemTotal = parseFloat(item.price) * item.quantity;
       totalAmount += itemTotal;
@@ -824,7 +869,9 @@ exports.placeOrder = async (req, res) => {
         product_id: item.product_id,
         product_name: item.product.name,
         quantity: item.quantity,
-        price: item.price
+        price: item.price,
+        variant_id: hasVariant ? item.variant_id : null,
+        variant_name: hasVariant ? (item.variant_name || variantForItem?.variant_value || null) : null
       });
     }
 
@@ -948,7 +995,7 @@ exports.instantPurchase = async (req, res) => {
   try {
     const userId = req.user.id;
     const userType = req.userType;
-    const { product_id, quantity, shipping_address, payment_method, notes, coupon_code, billing_phone, phone } = req.body;
+    const { product_id, variant_id, quantity, shipping_address, payment_method, notes, coupon_code, billing_phone, phone } = req.body;
 
     if (!product_id || !quantity) {
       await t.rollback();
@@ -960,7 +1007,7 @@ exports.instantPurchase = async (req, res) => {
       return res.status(400).json({ message: 'Shipping address is required' });
     }
 
-    const product = await Product.findByPk(product_id, { transaction: t });
+    const product = await Product.findByPk(product_id, { transaction: t, lock: t.LOCK.UPDATE });
     if (!product) {
       await t.rollback();
       return res.status(404).json({ message: 'Product not found' });
@@ -972,18 +1019,51 @@ exports.instantPurchase = async (req, res) => {
       return res.status(400).json({ message: 'Quantity must be a positive integer' });
     }
 
-    if (product.stock < qty) {
+    const hasVariant = variant_id && Number(variant_id) > 0;
+    let selectedVariant = null;
+    let effectiveCustomerPrice = null;
+    let effectiveWholesalerPrice = null;
+    let effectiveStock = 0;
+    let variantNameSnapshot = null;
+
+    if (hasVariant) {
+      selectedVariant = await ProductVariant.findOne({
+        where: { id: variant_id, product_id: product.id },
+        transaction: t,
+        lock: t.LOCK.UPDATE
+      });
+      if (!selectedVariant) {
+        await t.rollback();
+        return res.status(400).json({ message: 'Selected variant is not valid for this product' });
+      }
+      if (selectedVariant.status === 'inactive') {
+        await t.rollback();
+        return res.status(400).json({ message: 'Selected variant is no longer available' });
+      }
+      effectiveCustomerPrice = selectedVariant.customer_price;
+      effectiveWholesalerPrice = selectedVariant.wholesaler_price;
+      effectiveStock = selectedVariant.stock;
+      variantNameSnapshot = selectedVariant.variant_value;
+    } else {
+      effectiveStock = product.stock;
+    }
+
+    if (effectiveStock < qty) {
       await t.rollback();
       return res
         .status(400)
-        .json({ message: `Insufficient stock. Available: ${product.stock}` });
+        .json({ message: `Insufficient stock${variantNameSnapshot ? ` for ${variantNameSnapshot}` : ''}. Available: ${effectiveStock}` });
     }
 
     let price = 0;
     if (userType === 'wholesaler') {
-      price = product.wholesaler_price;
+      price = effectiveWholesalerPrice != null && Number(effectiveWholesalerPrice) > 0
+        ? effectiveWholesalerPrice
+        : product.wholesaler_price;
     } else {
-      price = product.customer_price;
+      price = effectiveCustomerPrice != null && Number(effectiveCustomerPrice) > 0
+        ? effectiveCustomerPrice
+        : product.customer_price;
     }
 
     const numericPrice = parseFloat(price || 0);
@@ -1055,7 +1135,11 @@ exports.instantPurchase = async (req, res) => {
 
     const finalAmount = totalAmountRaw - discountAmount + shippingFee;
 
-    await product.decrement('stock', { by: qty, transaction: t });
+    if (hasVariant && selectedVariant) {
+      await selectedVariant.decrement('stock', { by: qty, transaction: t });
+    } else {
+      await product.decrement('stock', { by: qty, transaction: t });
+    }
 
     const orderData = {
       total_amount: finalAmount,
@@ -1085,7 +1169,9 @@ exports.instantPurchase = async (req, res) => {
         product_id: product.id,
         product_name: product.name,
         quantity: qty,
-        price: numericPrice
+        price: numericPrice,
+        variant_id: hasVariant ? selectedVariant.id : null,
+        variant_name: hasVariant ? variantNameSnapshot : null
       },
       { transaction: t }
     );
@@ -1470,7 +1556,12 @@ exports.cancelMyOrder = async (req, res) => {
     }
 
     for (const item of order.items || []) {
-      if (item.product) {
+      if (item.variant_id && Number(item.variant_id) > 0) {
+        const variant = await ProductVariant.findByPk(item.variant_id, { transaction: t, lock: t.LOCK.UPDATE });
+        if (variant) {
+          await variant.increment('stock', { by: item.quantity, transaction: t });
+        }
+      } else if (item.product) {
         await item.product.increment('stock', { by: item.quantity, transaction: t });
       }
     }
@@ -1546,7 +1637,7 @@ exports.getAllOrders = async (req, res) => {
       include: [
         { model: User, as: 'customer', attributes: ['id', 'name', 'email', 'phone'] },
         { model: Wholesaler, as: 'wholesaler', attributes: ['id', 'name', 'business_name', 'email', 'phone'] },
-        { model: OrderItem, as: 'items', attributes: ['id', 'product_name', 'quantity', 'price'] }
+        { model: OrderItem, as: 'items', attributes: ['id', 'product_name', 'quantity', 'price', 'variant_id', 'variant_name'] }
       ]
     });
 
@@ -1604,14 +1695,21 @@ exports.updateOrderStatus = async (req, res) => {
         const discount = Number(order.discount_amount || 0);
         const total = Number(order.total_amount || 0);
         const dateStr = new Date(order.created_at).toLocaleString();
-        const rows = (order.items || []).map((it) => `
+        const rows = (order.items || []).map((it) => {
+          const variantHtml = it.variant_name
+            ? `<div style="font-size:11px;color:#6b7280;margin-top:2px;">${it.variant_name}</div>`
+            : '';
+          return `
           <tr>
-            <td style="padding:8px;border-bottom:1px solid #eee;">${it.product_name}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee;">
+              <div>${it.product_name}</div>
+              ${variantHtml}
+            </td>
             <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">${it.quantity}</td>
             <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">₹${Number(it.price).toFixed(2)}</td>
             <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">₹${(Number(it.price) * it.quantity).toFixed(2)}</td>
           </tr>
-        `).join('');
+        `}).join('');
         const html = `
 <!doctype html>
 <html>

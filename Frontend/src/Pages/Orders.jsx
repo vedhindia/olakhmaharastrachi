@@ -910,7 +910,16 @@ const Orders = () => {
                                     />
                                   )}
                                 </td>
-                                <td>{item.product_name || 'Product'}</td>
+                                <td>
+                                  <div className="fw-medium">
+                                    {item.product_name || 'Product'}
+                                  </div>
+                                  {item.variant_name && (
+                                    <div className="small mt-1">
+                                      <Badge bg="secondary">{item.variant_name}</Badge>
+                                    </div>
+                                  )}
+                                </td>
                                 <td>{qty}</td>
                                 <td>{price.toFixed(2)}</td>
                                 <td>{(price * qty).toFixed(2)}</td>

@@ -1,5 +1,6 @@
 const Category = require('./Category');
 const Product = require('./Product');
+const ProductVariant = require('./ProductVariant');
 const ProductImage = require('./ProductImage');
 const AdminUser = require('./AdminUser');
 const User = require('./User');
@@ -17,6 +18,18 @@ const ReturnRequest = require('./ReturnRequest');
 // Associations
 Category.hasMany(Product, { foreignKey: 'category_id', as: 'products' });
 Product.belongsTo(Category, { foreignKey: 'category_id', as: 'category' });
+
+// ProductVariants associations
+Product.hasMany(ProductVariant, { foreignKey: 'product_id', as: 'variants', onDelete: 'CASCADE' });
+ProductVariant.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+
+// CartItem -> ProductVariant (optional link, since NULL = simple product)
+ProductVariant.hasMany(CartItem, { foreignKey: 'variant_id', as: 'cartItems', onDelete: 'SET NULL' });
+CartItem.belongsTo(ProductVariant, { foreignKey: 'variant_id', as: 'variant' });
+
+// OrderItem -> ProductVariant (optional link, snapshot pattern)
+ProductVariant.hasMany(OrderItem, { foreignKey: 'variant_id', as: 'orderItems' });
+OrderItem.belongsTo(ProductVariant, { foreignKey: 'variant_id', as: 'variant' });
 
 Product.hasMany(ProductImage, { foreignKey: 'product_id', as: 'images' });
 ProductImage.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
@@ -79,6 +92,7 @@ CommunicationLog.belongsTo(Order, { foreignKey: 'entity_id', constraints: false,
 module.exports = {
   Category,
   Product,
+  ProductVariant,
   ProductImage,
   AdminUser,
   User,

@@ -742,6 +742,11 @@ const Orders = () => {
                         <tr key={item.id}>
                           <td className="py-3 ps-4 border-bottom-0">
                               <div className="fw-medium text-dark">{item.product_name}</div>
+                              {item.variant_name && (
+                                <div className="small mt-1">
+                                  <Badge bg="secondary">{item.variant_name}</Badge>
+                                </div>
+                              )}
                           </td>
                           <td className="text-end py-3 border-bottom-0">₹{item.price}</td>
                           <td className="text-center py-3 border-bottom-0">{item.quantity}</td>

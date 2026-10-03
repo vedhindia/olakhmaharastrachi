@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Container, Row, Col, Table, Button, Alert, Pagination } from 'react-bootstrap';
+import { Container, Row, Col, Table, Button, Alert, Pagination, Badge } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShieldCheck, Truck, RotateCcw, X } from 'lucide-react';
 import './Product.css';
@@ -217,13 +217,17 @@ const Cart = () => {
     setMessage('');
     setError('');
     try {
+      const payload = { product_id: item.product_id, quantity };
+      if (item.variant_id != null) {
+        payload.variant_id = Number(item.variant_id);
+      }
       const response = await fetch(`${API_BASE}/cart/update`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ product_id: item.product_id, quantity }),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -253,13 +257,17 @@ const Cart = () => {
     setMessage('');
     setError('');
     try {
+      const payload = { product_id: item.product_id };
+      if (item.variant_id != null) {
+        payload.variant_id = Number(item.variant_id);
+      }
       const response = await fetch(`${API_BASE}/cart/remove`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ product_id: item.product_id }),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -417,6 +425,11 @@ const Cart = () => {
                                 {item.product ? item.product.name : 'Product'}
                               </div>
                             </Link>
+                            {item.variant_name && (
+                              <div className="small mt-1">
+                                <Badge bg="secondary">{item.variant_name}</Badge>
+                              </div>
+                            )}
                             <div className="small text-success">In stock</div>
                           </td>
                           <td className="text-center fw-bold">
