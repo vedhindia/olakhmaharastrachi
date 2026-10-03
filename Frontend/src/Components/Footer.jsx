@@ -57,7 +57,7 @@ const Footer = () => {
             <Col lg={4} md={12}>
               <div className="brand-block">
                 <img src={logo} alt="Ashoka" className="footer-logo" />
-                <p className="brand-text">Ashoka Products is committed to delivering premium-quality food products with purity, hygiene, and customer satisfaction.</p>
+                <p className="brand-text">Olakh Maharashtrachi is committed to delivering premium-quality food products with purity, hygiene, and customer satisfaction.</p>
                 <div className="socials">
                   <a href="https://www.facebook.com/" target="_blank" rel="noreferrer" aria-label="Facebook" className="social-btn"><Facebook size={18} /></a>
                   <a href="https://x.com/" target="_blank" rel="noreferrer" aria-label="Twitter" className="social-btn"><Twitter size={18} /></a>

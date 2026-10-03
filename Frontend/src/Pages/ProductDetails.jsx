@@ -614,7 +614,7 @@ const ProductDetails = () => {
                             : 'No rating yet'}
                         </span>
                         <span className="small text-muted ms-1">
-                          ({totalReviews} Review{totalReviews === 1 ? '' : 's'})
+                          {`(${totalReviews} ${totalReviews === 1 ? 'Review' : 'Reviews'})`}
                         </span>
                       </div>
                     </div>

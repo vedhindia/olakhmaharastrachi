@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Container, Nav, Navbar as BootstrapNavbar, NavDropdown, Button, Alert } from 'react-bootstrap';
 import { Phone, ChevronDown, Heart, ShoppingBag, Menu, Salad, User, Search } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import logo from '../assets/images/logoo.png';
 import './Navbar.css';
 
@@ -39,6 +40,7 @@ const getCartCountFromStorage = () => {
 };
 
 const Navbar = () => {
+  const { i18n, t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
@@ -340,9 +342,23 @@ const Navbar = () => {
             <span className="fw-bold">omksarsatpute2006@gmail.com</span>
           </div>
           <div className="top-bar-right d-flex gap-3 small">
-           
-           
-          
+            <label className="language-selector d-flex align-items-center gap-2">
+              <span>{t('Language')}</span>
+              <select
+                aria-label={t('Select language')}
+                className="form-select form-select-sm"
+                value={i18n.resolvedLanguage || 'en'}
+                onChange={(event) => {
+                  const language = event.target.value;
+                  window.localStorage.setItem('siteLanguage', language);
+                  i18n.changeLanguage(language);
+                }}
+              >
+                <option value="en">English</option>
+                <option value="hi">हिन्दी</option>
+                <option value="mr">मराठी</option>
+              </select>
+            </label>
           </div>
         </Container>
       </div>

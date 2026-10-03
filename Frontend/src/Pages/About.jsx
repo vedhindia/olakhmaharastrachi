@@ -102,9 +102,9 @@ export default function About() {
         </div>
       </section>
 
-      {/* ── What Makes Ashoka Different ── */}
+      {/* ── What Makes Olakh Maharashtrachi Different ── */}
       <section className="diff">
-        <h2 className="section-title with-line">What Makes Ashoka Different</h2>
+        <h2 className="section-title with-line">What Makes Olakh Maharashtrachi Different</h2>
         <div className="diff__grid">
           {diffCards.map((c, i) => (
             <div className="diff__card" key={i}>

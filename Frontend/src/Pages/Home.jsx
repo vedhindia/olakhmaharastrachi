@@ -182,47 +182,47 @@ const Home = () => {
     {
       name: 'Rajesh Sharma',
       role: 'Retail Partner',
-      text: 'The quality of Ashoka Products is exceptional. Every product is fresh, hygienically packed, and delivered on time. Their commitment to quality and customer satisfaction makes them our preferred choice.',
+      text: 'The quality of Olakh Maharashtrachi is exceptional. Every product is fresh, hygienically packed, and delivered on time. Their commitment to quality and customer satisfaction makes them our preferred choice.',
     },
     {
       name: 'Priya Mehta',
       role: 'Distributor',
-      text: "We've been sourcing products from Ashoka Products for over a year, and the consistency in quality has always impressed us. Highly recommended for anyone looking for reliable food products.",
+      text: "We've been sourcing products from Olakh Maharashtrachi for over a year, and the consistency in quality has always impressed us. Highly recommended for anyone looking for reliable food products.",
     },
     {
       name: 'Amit Verma',
       role: 'Grocery Store Owner',
-      text: 'Ashoka Products perfectly combines traditional taste with modern packaging. Our customers love the freshness and authentic flavor of every product.',
+      text: 'Olakh Maharashtrachi perfectly combines traditional taste with modern packaging. Our customers love the freshness and authentic flavor of every product.',
     },
     {
       name: 'Sunil Patil',
       role: 'Wholesale Buyer',
-      text: 'Excellent product range, competitive pricing, and outstanding customer support. Working with Ashoka Products has been a great experience.',
+      text: 'Excellent product range, competitive pricing, and outstanding customer support. Working with Olakh Maharashtrachi has been a great experience.',
     },
     {
       name: 'Neha Kulkarni',
       role: 'Happy Customer',
-      text: 'The purity and quality standards maintained by Ashoka Products are truly commendable. Their products have become a trusted choice for our family.',
+      text: 'The purity and quality standards maintained by Olakh Maharashtrachi are truly commendable. Their products have become a trusted choice for our family.',
     },
     {
       name: 'Deepak Agarwal',
       role: 'Business Owner',
-      text: 'Ashoka Products has consistently delivered premium-quality products that meet our expectations. The freshness, taste, and packaging quality are excellent.',
+      text: 'Olakh Maharashtrachi has consistently delivered premium-quality products that meet our expectations. The freshness, taste, and packaging quality are excellent.',
     },
     {
       name: 'Kavita Shah',
       role: 'Retailer',
-      text: 'We appreciate the professionalism and reliability of Ashoka Products. Their dedication to quality control and timely deliveries has helped us serve our customers better.',
+      text: 'We appreciate the professionalism and reliability of Olakh Maharashtrachi. Their dedication to quality control and timely deliveries has helped us serve our customers better.',
     },
     {
       name: 'Mahesh Jadhav',
       role: 'Distributor',
-      text: 'The rich taste and superior quality of Ashoka Products stand out from other brands in the market. Our customers regularly ask for their products by name.',
+      text: 'The rich taste and superior quality of Olakh Maharashtrachi stand out from other brands in the market. Our customers regularly ask for their products by name.',
     },
     {
       name: 'Anjali Desai',
       role: 'Wholesale Partner',
-      text: 'From product quality to customer support, every experience with Ashoka Products has been outstanding. We look forward to a long-term business relationship.',
+      text: 'From product quality to customer support, every experience with Olakh Maharashtrachi has been outstanding. We look forward to a long-term business relationship.',
     },
   ];
 

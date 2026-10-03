@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './Components/Navbar';
 import Footer from './Components/Footer';
+import LocalizedContent from './Components/LocalizedContent';
 import Home from './Pages/Home';
 import About from './Pages/About';
 import Product from './Pages/Product';
@@ -41,6 +42,7 @@ const ScrollToTop = () => {
 function App() {
   return (
     <>
+      <LocalizedContent />
       <Navbar />
       <ScrollToTop />
       <Routes>
