@@ -1,4 +1,4 @@
-const { Cart, CartItem, Product, ProductImage } = require('../models');
+const { Cart, CartItem, Product, ProductImage, ProductVariant } = require('../models');
 const path = require('path');
 
 const normalizeStoredImageUrl = (imageUrl) => {
@@ -11,9 +11,31 @@ const normalizeStoredImageUrl = (imageUrl) => {
   return `/uploads/${baseName}`;
 };
 
+const resolveVariantPriceAndStock = (product, variant, userType) => {
+  let price = 0;
+  let stock = Number(product?.stock ?? 0);
+  let variantName = null;
+  if (variant) {
+    variantName = variant.variant_value || null;
+    stock = Number(variant.stock ?? 0);
+    if (userType === 'wholesaler') {
+      price = variant.wholesaler_price ?? variant.customer_price ?? product?.wholesaler_price ?? product?.customer_price ?? 0;
+    } else {
+      price = variant.customer_price ?? product?.customer_price ?? 0;
+    }
+  } else {
+    if (userType === 'wholesaler') {
+      price = product?.wholesaler_price ?? product?.customer_price ?? 0;
+    } else {
+      price = product?.customer_price ?? 0;
+    }
+  }
+  return { price: Number(price) || 0, stock: stock >= 0 ? stock : 0, variantName };
+};
+
 exports.addToCart = async (req, res) => {
   try {
-    const { product_id, quantity } = req.body;
+    const { product_id, quantity, variant_id } = req.body;
     const userId = req.user.id;
     const userType = req.userType; // 'customer' or 'wholesaler'
 
@@ -26,13 +48,27 @@ exports.addToCart = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Determine price based on user type
-    let price = 0;
-    if (userType === 'wholesaler') {
-      price = product.wholesaler_price;
-    } else {
-      price = product.customer_price;
+    const normalizedVariantId =
+      variant_id === undefined || variant_id === null || variant_id === ''
+        ? null
+        : Number.isNaN(Number(variant_id))
+        ? null
+        : Number(variant_id);
+
+    let variant = null;
+    if (normalizedVariantId !== null) {
+      variant = await ProductVariant.findOne({
+        where: { id: normalizedVariantId, product_id: product_id },
+      });
+      if (!variant) {
+        return res.status(400).json({ message: 'Selected product variant does not exist' });
+      }
+      if (variant.status === 'inactive') {
+        return res.status(400).json({ message: 'Selected variant is currently unavailable' });
+      }
     }
+
+    const { price, stock, variantName } = resolveVariantPriceAndStock(product, variant, userType);
 
     // Find or create cart
     let cartWhere = {};
@@ -47,35 +83,40 @@ exports.addToCart = async (req, res) => {
       cart = await Cart.create(cartWhere);
     }
 
-    // Check if item exists in cart
-    let cartItem = await CartItem.findOne({
-      where: {
-        cart_id: cart.id,
-        product_id: product_id
-      }
-    });
+    // Cart item uniqueness: product_id + variant_id (different variants = different line items)
+    const itemWhere = {
+      cart_id: cart.id,
+      product_id: product_id,
+    };
+    if (normalizedVariantId === null) {
+      itemWhere.variant_id = null;
+    } else {
+      itemWhere.variant_id = normalizedVariantId;
+    }
+    let cartItem = await CartItem.findOne({ where: itemWhere });
 
     let newQuantity = parseInt(quantity);
     if (cartItem) {
         newQuantity += cartItem.quantity;
     }
 
-    if (product.stock < newQuantity) {
-      return res.status(400).json({ message: 'Insufficient stock. Available: ' + product.stock });
+    if (stock < newQuantity) {
+      return res.status(400).json({ message: 'Insufficient stock. Available: ' + stock });
     }
 
     if (cartItem) {
-      // Update quantity
       cartItem.quantity = newQuantity;
-      cartItem.price = price; // Update price to current
+      cartItem.price = price;
+      if (variantName) cartItem.variant_name = variantName;
       await cartItem.save();
     } else {
-      // Create new item
       cartItem = await CartItem.create({
         cart_id: cart.id,
         product_id: product_id,
+        variant_id: normalizedVariantId,
+        variant_name: variantName,
         quantity: newQuantity,
-        price: price
+        price: price,
       });
     }
 
@@ -108,18 +149,21 @@ exports.getCart = async (req, res) => {
             {
               model: Product,
               as: 'product',
-              include: [{ model: ProductImage, as: 'images' }]
-            }
-          ]
-        }
-      ]
+              include: [{ model: ProductImage, as: 'images' }],
+            },
+            {
+              model: ProductVariant,
+              as: 'variant',
+            },
+          ],
+        },
+      ],
     });
 
     if (!cart) {
       return res.status(200).json({ items: [], total: 0 });
     }
 
-    // Calculate total
     let total = 0;
     const items = cart.items.map(item => {
       const itemTotal = parseFloat(item.price) * item.quantity;
@@ -133,14 +177,14 @@ exports.getCart = async (req, res) => {
       }
       return {
         ...json,
-        itemTotal: itemTotal.toFixed(2)
+        itemTotal: itemTotal.toFixed(2),
       };
     });
 
     res.status(200).json({
       id: cart.id,
       items: items,
-      total: total.toFixed(2)
+      total: total.toFixed(2),
     });
   } catch (error) {
     console.error('Get cart error:', error);
@@ -151,22 +195,20 @@ exports.getCart = async (req, res) => {
 exports.updateCartItem = async (req, res) => {
   try {
     const { quantity } = req.body;
-    const { itemId } = req.params; // Using cart item ID? Or Product ID? Usually easier with Product ID or Item ID.
-    // Assuming itemId is CartItem ID or Product ID. Let's stick to Product ID for cleaner API, or CartItem ID.
-    // User said "Update item quantity". Usually PUT /cart/update implies body has product_id and quantity.
-    // Let's assume body has { product_id, quantity }
-    
-    // Wait, typical REST is PUT /cart/items/:id or PUT /cart with body.
-    // User prompt: "PUT /update – Update item quantity."
-    // I'll implement it as PUT /update with body { product_id, quantity }
-    
-    const { product_id } = req.body;
+    const { product_id, variant_id } = req.body;
     const userId = req.user.id;
     const userType = req.userType;
 
     if (!product_id || quantity === undefined) {
        return res.status(400).json({ message: 'Product ID and quantity are required' });
     }
+
+    const normalizedVariantId =
+      variant_id === undefined || variant_id === null || variant_id === ''
+        ? null
+        : Number.isNaN(Number(variant_id))
+        ? null
+        : Number(variant_id);
 
     let cartWhere = {};
     if (userType === 'wholesaler') {
@@ -180,12 +222,16 @@ exports.updateCartItem = async (req, res) => {
       return res.status(404).json({ message: 'Cart not found' });
     }
 
-    const cartItem = await CartItem.findOne({
-      where: {
-        cart_id: cart.id,
-        product_id: product_id
-      }
-    });
+    const itemWhere = {
+      cart_id: cart.id,
+      product_id: product_id,
+    };
+    if (normalizedVariantId === null) {
+      itemWhere.variant_id = null;
+    } else {
+      itemWhere.variant_id = normalizedVariantId;
+    }
+    const cartItem = await CartItem.findOne({ where: itemWhere });
 
     if (!cartItem) {
       return res.status(404).json({ message: 'Item not found in cart' });
@@ -209,11 +255,7 @@ exports.updateCartItem = async (req, res) => {
 
 exports.removeFromCart = async (req, res) => {
   try {
-    const { product_id } = req.body; // Or query param? DELETE usually has no body in some clients, but standard allows.
-    // User prompt: "DELETE /remove – Remove a specific item."
-    // I'll support body or query param. Let's use body for consistency, or path param /remove/:productId.
-    // Prompt implies /remove endpoint. I'll use body { product_id }.
-    
+    const { product_id, variant_id } = req.body;
     const userId = req.user.id;
     const userType = req.userType;
 
@@ -228,13 +270,25 @@ exports.removeFromCart = async (req, res) => {
     if (!cart) {
         return res.status(404).json({ message: 'Cart not found' });
     }
-    
-    const deleted = await CartItem.destroy({
-        where: {
-            cart_id: cart.id,
-            product_id: product_id
-        }
-    });
+
+    const normalizedVariantId =
+      variant_id === undefined || variant_id === null || variant_id === ''
+        ? null
+        : Number.isNaN(Number(variant_id))
+        ? null
+        : Number(variant_id);
+
+    const destroyWhere = {
+      cart_id: cart.id,
+      product_id: product_id,
+    };
+    if (normalizedVariantId === null) {
+      destroyWhere.variant_id = null;
+    } else {
+      destroyWhere.variant_id = normalizedVariantId;
+    }
+
+    const deleted = await CartItem.destroy({ where: destroyWhere });
 
     if (deleted) {
         res.status(200).json({ message: 'Item removed from cart' });

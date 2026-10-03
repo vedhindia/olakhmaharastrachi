@@ -27,7 +27,7 @@ const Categories = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentCategory, setCurrentCategory] = useState(null);
-  const [formData, setFormData] = useState({ category_name: '', slug: '', status: true, image: null });
+  const [formData, setFormData] = useState({ category_name: '', slug: '', status: true, image: null, variant_type: 'none' });
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -73,7 +73,8 @@ const Categories = () => {
         category_name: category.category_name,
         slug: category.slug || '',
         status: category.status,
-        image: null
+        image: null,
+        variant_type: category.variant_type || 'none'
     });
     setShowModal(true);
   };
@@ -85,6 +86,7 @@ const Categories = () => {
       data.append('category_name', formData.category_name);
       data.append('slug', formData.slug);
       data.append('status', formData.status);
+      data.append('variant_type', formData.variant_type || 'none');
       if (formData.image) {
         data.append('image', formData.image);
       }
@@ -103,7 +105,7 @@ const Categories = () => {
         toast.success('Category created');
       }
       setShowModal(false);
-      setFormData({ category_name: '', slug: '', status: true, image: null });
+      setFormData({ category_name: '', slug: '', status: true, image: null, variant_type: 'none' });
       setIsEditing(false);
       setCurrentCategory(null);
       fetchCategories(searchQuery, currentPage);
@@ -114,7 +116,7 @@ const Categories = () => {
 
   const handleCloseModal = () => {
     setShowModal(false);
-    setFormData({ category_name: '', slug: '', status: true, image: null });
+    setFormData({ category_name: '', slug: '', status: true, image: null, variant_type: 'none' });
     setIsEditing(false);
     setCurrentCategory(null);
   };
@@ -128,7 +130,7 @@ const Categories = () => {
             variant="primary"
             onClick={() => {
                 setIsEditing(false);
-                setFormData({ category_name: '', slug: '', status: true, image: null });
+                setFormData({ category_name: '', slug: '', status: true, image: null, variant_type: 'none' });
                 setShowModal(true);
             }}
             className="d-flex align-items-center"
@@ -164,13 +166,20 @@ const Categories = () => {
                     <th className="px-4 py-3">Sr No.</th>
                     <th className="px-4 py-3">Image</th>
                     <th className="px-4 py-3">Name</th>
+                    <th className="px-4 py-3">Variant Type</th>
                     <th className="px-4 py-3">Slug</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3 text-end">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {categories.map((category, index) => (
+                  {categories.map((category, index) => {
+                    const vType = category.variant_type || 'none';
+                    let badgeClass = 'bg-secondary';
+                    let badgeLabel = 'Standard';
+                    if (vType === 'weight') { badgeClass = 'bg-success'; badgeLabel = 'Weight-wise'; }
+                    if (vType === 'size') { badgeClass = 'bg-primary'; badgeLabel = 'Size-wise'; }
+                    return (
                     <tr key={category.id}>
                       <td className="px-4 py-3 text-muted">{(currentPage - 1) * 10 + index + 1}</td>
                       <td className="px-4 py-3">
@@ -185,6 +194,9 @@ const Categories = () => {
                         )}
                       </td>
                       <td className="px-4 py-3 fw-medium">{category.category_name}</td>
+                      <td className="px-4 py-3">
+                        <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
+                      </td>
                       <td className="px-4 py-3 text-muted">{category.slug}</td>
                       <td className="px-4 py-3">
                         <span className={`badge bg-${category.status ? 'success' : 'danger'}`}>
@@ -219,10 +231,11 @@ const Categories = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   {categories.length === 0 && (
                       <tr>
-                          <td colSpan="5" className="text-center py-4 text-muted">No categories found.</td>
+                          <td colSpan="7" className="text-center py-4 text-muted">No categories found.</td>
                       </tr>
                   )}
                 </tbody>
@@ -271,6 +284,32 @@ const Categories = () => {
                   accept="image/*"
                 />
               </Form.Group>
+              <div className="mb-3 p-3 bg-light rounded border">
+                <Form.Label className="fw-semibold d-block mb-2">Product Variant System <small className="text-muted fw-normal">(Choose at most one)</small></Form.Label>
+                <div className="d-flex flex-wrap gap-4">
+                  <Form.Check 
+                    type="checkbox" 
+                    label="Weight-wise (100g, 500g, 1kg etc.)" 
+                    checked={formData.variant_type === 'weight'}
+                    onChange={(e) => {
+                      const newChecked = e.target.checked;
+                      setFormData({ ...formData, variant_type: newChecked ? 'weight' : 'none' });
+                    }}
+                  />
+                  <Form.Check 
+                    type="checkbox" 
+                    label="Size-wise (S, M, L, XL etc.)" 
+                    checked={formData.variant_type === 'size'}
+                    onChange={(e) => {
+                      const newChecked = e.target.checked;
+                      setFormData({ ...formData, variant_type: newChecked ? 'size' : 'none' });
+                    }}
+                  />
+                </div>
+                <div className="form-text text-muted mt-2">
+                  Both unchecked = standard product (no variant options shown to customer).
+                </div>
+              </div>
               <Form.Group className="mb-3">
                 <Form.Check 
                   type="checkbox" 

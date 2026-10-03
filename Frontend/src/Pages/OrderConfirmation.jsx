@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Row, Col, Button, Spinner, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Button, Spinner, Alert, Badge } from 'react-bootstrap';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle2, ShoppingBag } from 'lucide-react';
 import './Product.css';
@@ -176,6 +176,11 @@ const OrderConfirmation = () => {
                           <div className="fw-semibold">
                             {item.product_name || (item.product && item.product.name) || 'Product'}
                           </div>
+                          {item.variant_name && (
+                            <div className="mt-1">
+                              <Badge bg="secondary">{item.variant_name}</Badge>
+                            </div>
+                          )}
                           <div className="text-muted small">
                             Quantity: {item.quantity} × ₹{Number(item.price || 0).toFixed(2)}
                           </div>

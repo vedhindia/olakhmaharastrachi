@@ -24,6 +24,21 @@ const CartItem = sequelize.define('CartItem', {
       key: 'id'
     }
   },
+  variant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'product_variants',
+      key: 'id'
+    },
+    onDelete: 'SET NULL',
+    comment: 'References product_variants table. NULL = no variant (simple product).',
+  },
+  variant_name: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    comment: 'Snapshot of variant_value at the time of adding to cart (for display / order history)',
+  },
   quantity: {
     type: DataTypes.INTEGER,
     defaultValue: 1,

@@ -24,6 +24,20 @@ const OrderItem = sequelize.define('OrderItem', {
       key: 'id'
     }
   },
+  variant_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'product_variants',
+      key: 'id',
+    },
+    comment: 'Foreign key snapshot. Variant may be deleted later but order history must remain.',
+  },
+  variant_name: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    comment: 'Snapshot of variant_value (e.g. "500g" or "Size M") for invoice/order history display.',
+  },
   product_name: {
     type: DataTypes.STRING,
     allowNull: false,

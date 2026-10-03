@@ -5,7 +5,7 @@ const path = require('path');
 
 exports.createCategory = async (req, res) => {
   try {
-    let { category_name, slug, status } = req.body;
+    let { category_name, slug, status, variant_type } = req.body;
     let image = null;
 
     if (req.file) {
@@ -15,6 +15,9 @@ exports.createCategory = async (req, res) => {
     if (!category_name) {
         return res.status(400).json({ message: 'Category name is required' });
     }
+
+    const validVariantTypes = ['none', 'weight', 'size'];
+    const normalizedVariantType = validVariantTypes.includes(variant_type) ? variant_type : 'none';
 
     // Auto-generate slug if not provided
     if (!slug) {
@@ -31,6 +34,7 @@ exports.createCategory = async (req, res) => {
       category_name,
       slug,
       status,
+      variant_type: normalizedVariantType,
       image
     });
 
@@ -102,7 +106,7 @@ exports.getCategoryById = async (req, res) => {
 
 exports.updateCategory = async (req, res) => {
   try {
-    const { category_name, slug, status } = req.body;
+    const { category_name, slug, status, variant_type } = req.body;
     let image = req.file ? req.file.filename : undefined;
 
     const category = await Category.findByPk(req.params.id);
@@ -119,6 +123,12 @@ exports.updateCategory = async (req, res) => {
         }
     }
 
+    const validVariantTypes = ['none', 'weight', 'size'];
+    let normalizedVariantType = category.variant_type;
+    if (typeof variant_type !== 'undefined' && variant_type !== null) {
+      normalizedVariantType = validVariantTypes.includes(variant_type) ? variant_type : 'none';
+    }
+
     // If new image is uploaded, delete old image
     if (image && category.image) {
         const oldImagePath = path.join(__dirname, '../../uploads/', category.image);
@@ -131,6 +141,7 @@ exports.updateCategory = async (req, res) => {
       category_name,
       slug,
       status,
+      variant_type: normalizedVariantType,
       ...(image && { image })
     });
 

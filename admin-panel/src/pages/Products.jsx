@@ -20,11 +20,12 @@ const Products = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [variants, setVariants] = useState([]);
   const lowStockSignatureRef = useRef('');
   const LOW_STOCK_TOAST_ID = 'admin:low-stock';
   const LOW_STOCK_THRESHOLD = 10;
 
-  const { register, handleSubmit, reset } = useForm({
+  const { register, handleSubmit, reset, watch } = useForm({
     defaultValues: {
       status: true,
       sku: '',
@@ -36,6 +37,43 @@ const Products = () => {
       category_id: ''
     }
   });
+
+  const selectedCategoryId = watch('category_id');
+  const selectedCategory = categories.find(c => String(c.id) === String(selectedCategoryId));
+  const selectedVariantType = selectedCategory?.variant_type || 'none';
+  const isVariantCategory = selectedVariantType === 'weight' || selectedVariantType === 'size';
+
+  useEffect(() => {
+    if (showModal && isVariantCategory && variants.length === 0) {
+      setVariants([{
+        variant_value: '',
+        customer_price: '',
+        wholesaler_price: '',
+        stock: 0,
+        status: 'active'
+      }]);
+    } else if (showModal && !isVariantCategory) {
+      setVariants([]);
+    }
+  }, [selectedCategoryId, showModal, isVariantCategory]);
+
+  const addVariantRow = () => {
+    setVariants(prev => [...prev, {
+      variant_value: '',
+      customer_price: '',
+      wholesaler_price: '',
+      stock: 0,
+      status: 'active'
+    }]);
+  };
+
+  const removeVariantRow = (index) => {
+    setVariants(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateVariantRow = (index, field, value) => {
+    setVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
+  };
 
   const fetchProducts = async (query = '', page = 1) => {
     try {
@@ -158,6 +196,19 @@ const Products = () => {
       stock: product.stock ?? product.stock_quantity ?? '',
       status: product.status === 'active'
     });
+
+    if (Array.isArray(product.variants) && product.variants.length > 0) {
+      setVariants(product.variants.map(v => ({
+        variant_value: v.variant_value || '',
+        customer_price: v.customer_price ?? '',
+        wholesaler_price: v.wholesaler_price ?? '',
+        stock: v.stock ?? 0,
+        status: v.status || 'active'
+      })));
+    } else {
+      setVariants([]);
+    }
+
     setShowModal(true);
   };
 
@@ -183,6 +234,13 @@ const Products = () => {
     formData.append('stock', data.stock ?? 0);
     formData.append('status', data.status ? 'active' : 'inactive');
 
+    if (isVariantCategory && variants.length > 0) {
+      const cleanVariants = variants.filter(v => v.variant_value && String(v.variant_value).trim() !== '');
+      formData.append('variants_json', JSON.stringify(cleanVariants));
+    } else {
+      formData.append('variants_json', JSON.stringify([]));
+    }
+
     if (data.main_image && data.main_image[0]) {
       formData.append('main_image', data.main_image[0]);
     }
@@ -203,6 +261,7 @@ const Products = () => {
       }
       setShowModal(false);
       reset();
+      setVariants([]);
       setIsEditing(false);
       setCurrentProduct(null);
       fetchProducts(searchQuery, currentPage);
@@ -224,6 +283,7 @@ const Products = () => {
       stock: '',
       category_id: ''
     });
+    setVariants([]);
     setIsEditing(false);
     setCurrentProduct(null);
   };
@@ -297,6 +357,7 @@ const Products = () => {
                   stock: '',
                   category_id: ''
                 });
+                setVariants([]);
                 setShowModal(true);
             }}
             className="d-flex align-items-center"
@@ -332,8 +393,8 @@ const Products = () => {
                     <th className="px-4 py-3">Sr No.</th>
                     <th className="px-4 py-3">Image</th>
                     <th className="px-4 py-3">Name</th>
-                    <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3">Variants</th>
                     <th className="px-4 py-3">Customer Price</th>
                     <th className="px-4 py-3">Stock</th>
                     <th className="px-4 py-3 text-end">Actions</th>
@@ -342,7 +403,18 @@ const Products = () => {
                 <tbody>
                   {products.map((product, index) => {
                     const mainImage = getMainImage(product);
-                    const stockValue = product.stock ?? product.stock_quantity;
+                    const stockValue = product.effective_stock ?? product.stock ?? product.stock_quantity;
+                    const hasVariants = product.has_variants || (Array.isArray(product.variants) && product.variants.length > 0);
+                    const variantCount = Array.isArray(product.variants) ? product.variants.length : 0;
+                    const minC = product.min_customer_price;
+                    const maxC = product.max_customer_price;
+                    let priceDisplay = product.customer_price ? `₹${product.customer_price}` : '-';
+                    if (hasVariants && minC != null && maxC != null) {
+                      priceDisplay = (Number(minC) === Number(maxC))
+                        ? `₹${Number(minC).toFixed(0)}`
+                        : `₹${Number(minC).toFixed(0)} – ₹${Number(maxC).toFixed(0)}`;
+                    }
+                    const categoryVariantType = categories.find(c => c.id === product.category_id)?.variant_type || 'none';
                     return (
                     <tr key={product.id}>
                       <td className="px-4 py-3">{(currentPage - 1) * 10 + index + 1}</td>
@@ -354,13 +426,24 @@ const Products = () => {
                           )}
                       </td>
                       <td className="px-4 py-3 fw-medium align-middle">{product.name}</td>
-                      <td className="px-4 py-3 text-muted align-middle">{product.sku || '-'}</td>
                       <td className="px-4 py-3 text-muted align-middle">
                           {categories.find(c => c.id === product.category_id)?.category_name || '-'}
+                          {categoryVariantType !== 'none' && (
+                            <div className="small mt-1">
+                              <span className={`badge ${categoryVariantType === 'weight' ? 'bg-success' : 'bg-primary'}`}>
+                                {categoryVariantType === 'weight' ? 'Weight' : 'Size'}
+                              </span>
+                            </div>
+                          )}
                       </td>
-                      <td className="px-4 py-3 text-muted align-middle">
-                          {product.customer_price ? `₹${product.customer_price}` : '-'}
+                      <td className="px-4 py-3 align-middle">
+                          {hasVariants ? (
+                            <Badge bg="info" className="text-dark">{variantCount || 'N'} variant{variantCount === 1 ? '' : 's'}</Badge>
+                          ) : (
+                            <span className="text-muted small">Standard</span>
+                          )}
                       </td>
+                      <td className="px-4 py-3 text-muted align-middle">{priceDisplay}</td>
                       <td className="px-4 py-3 text-muted align-middle">
                           {stockValue === null || stockValue === undefined || stockValue === '' ? '-' : stockValue}
                       </td>
@@ -521,6 +604,120 @@ const Products = () => {
                 <Form.Control type="file" multiple {...register('images')} />
               </Form.Group>
 
+              {isVariantCategory && (
+                <div className="mb-4 border rounded p-3 bg-light">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                      <h6 className="mb-0 fw-semibold">
+                        {selectedVariantType === 'weight' ? 'Pack Weight Variants' : 'Clothing Size Variants'}
+                      </h6>
+                      <small className="text-muted">
+                        {selectedVariantType === 'weight'
+                          ? 'e.g. 100g, 250g, 500g, 1kg. Leave price blank to fall back to default product price.'
+                          : 'e.g. S, M, L, XL, XXL. Leave price blank to fall back to default product price.'}
+                      </small>
+                    </div>
+                    <Button variant="outline-primary" size="sm" onClick={addVariantRow}>
+                      <Plus size={14} className="me-1" /> Add Row
+                    </Button>
+                  </div>
+
+                  {variants.length === 0 && (
+                    <div className="text-center text-muted small py-3 border border-dashed rounded">
+                      No variants added. Click &quot;Add Row&quot; to start.
+                    </div>
+                  )}
+
+                  {variants.length > 0 && (
+                    <div className="table-responsive">
+                      <Table size="sm" bordered className="mb-0 bg-white">
+                        <thead className="bg-light">
+                          <tr>
+                            <th style={{ minWidth: '140px' }}>
+                              {selectedVariantType === 'weight' ? 'Pack Size (e.g. 1kg)' : 'Size (e.g. M)'}
+                            </th>
+                            <th style={{ minWidth: '120px' }}>Customer Price</th>
+                            <th style={{ minWidth: '120px' }}>Wholesaler Price</th>
+                            <th style={{ minWidth: '90px' }}>Stock</th>
+                            <th style={{ minWidth: '90px' }}>Active</th>
+                            <th style={{ width: '60px' }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {variants.map((v, i) => (
+                            <tr key={i}>
+                              <td>
+                                <Form.Control
+                                  size="sm"
+                                  type="text"
+                                  value={v.variant_value}
+                                  placeholder={selectedVariantType === 'weight' ? 'e.g. 500g' : 'e.g. L'}
+                                  onChange={(e) => updateVariantRow(i, 'variant_value', e.target.value)}
+                                  required
+                                />
+                              </td>
+                              <td>
+                                <Form.Control
+                                  size="sm"
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={v.customer_price}
+                                  placeholder="Default"
+                                  onChange={(e) => updateVariantRow(i, 'customer_price', e.target.value)}
+                                />
+                              </td>
+                              <td>
+                                <Form.Control
+                                  size="sm"
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={v.wholesaler_price}
+                                  placeholder="Default"
+                                  onChange={(e) => updateVariantRow(i, 'wholesaler_price', e.target.value)}
+                                />
+                              </td>
+                              <td>
+                                <Form.Control
+                                  size="sm"
+                                  type="number"
+                                  step="1"
+                                  min="0"
+                                  value={v.stock}
+                                  onChange={(e) => updateVariantRow(i, 'stock', e.target.value)}
+                                />
+                              </td>
+                              <td className="text-center align-middle">
+                                <Form.Check
+                                  type="checkbox"
+                                  label=""
+                                  checked={v.status === 'active' || v.status === true}
+                                  onChange={(e) => updateVariantRow(i, 'status', e.target.checked ? 'active' : 'inactive')}
+                                />
+                              </td>
+                              <td className="text-center align-middle">
+                                {variants.length > 1 && (
+                                  <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    className="p-0 d-inline-flex align-items-center justify-content-center"
+                                    style={{ width: '24px', height: '24px', borderRadius: '50%' }}
+                                    onClick={() => removeVariantRow(i)}
+                                  >
+                                    <X size={12} />
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <Row>
                   <Col md={12}>
                       <Form.Group className="mb-3">
@@ -675,6 +872,56 @@ const Products = () => {
                                         </Col>
                                     </Row>
                                     
+                                    {((Array.isArray(viewProductData.variants) && viewProductData.variants.length > 0) || viewProductData.has_variants) && (
+                                      <div className="mb-3 mt-4">
+                                        <strong className="d-block text-dark mb-2">Product Variants</strong>
+                                        <div className="bg-white rounded border shadow-sm overflow-hidden">
+                                          <div className="table-responsive">
+                                            <Table size="sm" className="mb-0">
+                                              <thead className="bg-light">
+                                                <tr>
+                                                  <th>Value</th>
+                                                  <th className="text-end">Customer</th>
+                                                  <th className="text-end">Wholesaler</th>
+                                                  <th className="text-end">Stock</th>
+                                                  <th className="text-center">Status</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {(Array.isArray(viewProductData.variants) ? viewProductData.variants : []).map((v, i) => (
+                                                  <tr key={v.id || i}>
+                                                    <td className="fw-medium">{v.variant_value}</td>
+                                                    <td className="text-end text-success fw-medium">
+                                                      {v.customer_price != null && Number(v.customer_price) > 0
+                                                        ? `₹${Number(v.customer_price).toFixed(2)}`
+                                                        : <span className="text-muted small">Default</span>}
+                                                    </td>
+                                                    <td className="text-end text-primary fw-medium">
+                                                      {v.wholesaler_price != null && Number(v.wholesaler_price) > 0
+                                                        ? `₹${Number(v.wholesaler_price).toFixed(2)}`
+                                                        : <span className="text-muted small">Default</span>}
+                                                    </td>
+                                                    <td className="text-end">{v.stock ?? 0}</td>
+                                                    <td className="text-center">
+                                                      <Badge bg={v.status === 'active' || v.status === true ? 'success' : 'secondary'}>
+                                                        {v.status === 'active' || v.status === true ? 'Active' : 'Inactive'}
+                                                      </Badge>
+                                                    </td>
+                                                  </tr>
+                                                ))}
+                                                {(!Array.isArray(viewProductData.variants) || viewProductData.variants.length === 0) && (
+                                                  <tr>
+                                                    <td colSpan="5" className="text-center text-muted py-3 small">
+                                                      (Variant summary not available in list view)
+                                                    </td>
+                                                  </tr>
+                                                )}
+                                              </tbody>
+                                            </Table>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
                                     <div className="mt-auto">
                                         <strong className="d-block text-dark mb-2">Description</strong>
                                         <div className="bg-white p-3 rounded text-break border shadow-sm" style={{maxHeight: '150px', overflowY: 'auto'}}>

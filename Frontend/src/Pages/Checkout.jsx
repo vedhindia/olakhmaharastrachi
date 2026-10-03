@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Container, Row, Col, Form, Button, Alert, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Form, Button, Alert, Spinner, Badge } from 'react-bootstrap';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import './Checkout.css';
 
@@ -172,13 +172,14 @@ const Checkout = () => {
           throw new Error('Instant purchase data is invalid. Please try again.');
         }
         const pid = parsed.productId || parsed.product_id;
+        const variantIdRaw = parsed.variant_id != null ? Number(parsed.variant_id) : null;
         const qtyRaw = quantityParam || parsed.quantity || 1;
         const qty = Number.isFinite(Number(qtyRaw)) && Number(qtyRaw) > 0 ? Number(qtyRaw) : 1;
         if (!pid) {
           throw new Error('Instant purchase item is missing. Please try again.');
         }
 
-        const response = await fetch(`${API_BASE}/products/${pid}/priced`, {
+        const response = await fetch(`${API_BASE}/products/${pid}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -187,7 +188,59 @@ const Checkout = () => {
         if (!response.ok) {
           throw new Error(data.message || 'Failed to load product for instant purchase');
         }
-        const effectivePrice = Number(data.effective_price || 0);
+        const baseRetail = Number(data.customer_price || 0);
+        const baseWholesale = Number(data.wholesaler_price || 0);
+        const tier = localStorage.getItem('wholesalerToken') ? 'wholesale' : 'retail';
+        let effectivePrice = 0;
+        let variantName = null;
+        const variants = Array.isArray(data.variants) ? data.variants : [];
+        let targetVariant = null;
+        if (variantIdRaw != null && variants.length > 0) {
+          targetVariant = variants.find((v) => Number(v.id) === variantIdRaw);
+          if (targetVariant && String(targetVariant.status || 'active').toLowerCase() === 'active') {
+            variantName = targetVariant.variant_value || null;
+            const vRetail =
+              targetVariant.customer_price != null && targetVariant.customer_price !== ''
+                ? Number(targetVariant.customer_price)
+                : null;
+            const vWholesale =
+              targetVariant.wholesaler_price != null && targetVariant.wholesaler_price !== ''
+                ? Number(targetVariant.wholesaler_price)
+                : null;
+            if (tier === 'wholesale') {
+              effectivePrice =
+                vWholesale != null && !Number.isNaN(vWholesale) && vWholesale > 0
+                  ? vWholesale
+                  : baseWholesale > 0
+                  ? baseWholesale
+                  : baseRetail > 0
+                  ? baseRetail
+                  : 0;
+            } else {
+              effectivePrice =
+                vRetail != null && !Number.isNaN(vRetail) && vRetail > 0
+                  ? vRetail
+                  : baseRetail > 0
+                  ? baseRetail
+                  : baseWholesale > 0
+                  ? baseWholesale
+                  : 0;
+            }
+          }
+        }
+        if (!effectivePrice || effectivePrice <= 0) {
+          const pricedResp = await fetch(`${API_BASE}/products/${pid}/priced`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const pricedData = await pricedResp.json();
+          if (pricedResp.ok) {
+            effectivePrice = Number(pricedData.effective_price || 0);
+          } else if (tier === 'wholesale') {
+            effectivePrice = baseWholesale > 0 ? baseWholesale : baseRetail;
+          } else {
+            effectivePrice = baseRetail > 0 ? baseRetail : baseWholesale;
+          }
+        }
         if (!Number.isFinite(effectivePrice) || effectivePrice <= 0) {
           throw new Error('Price not available for instant purchase');
         }
@@ -196,6 +249,8 @@ const Checkout = () => {
           name: data.name,
           price: effectivePrice,
           quantity: qty,
+          variant_id: variantIdRaw,
+          variant_name: variantName,
         });
       } catch (err) {
         setInstantItem(null);
@@ -402,8 +457,9 @@ const Checkout = () => {
   const instantItems = instantItem
     ? [
         {
-          id: instantItem.productId,
+          id: `${instantItem.productId}-${instantItem.variant_id ?? 'no-variant'}`,
           product: { name: instantItem.name },
+          variant_name: instantItem.variant_name || null,
           quantity: instantItem.quantity,
           itemTotal: instantItem.price * instantItem.quantity,
         },
@@ -578,6 +634,9 @@ const Checkout = () => {
         }
         createBody.product_id = instantItem.productId;
         createBody.quantity = instantItem.quantity;
+        if (instantItem.variant_id != null) {
+          createBody.variant_id = Number(instantItem.variant_id);
+        }
       }
       const createResponse = await fetch(createUrl, {
         method: 'POST',
@@ -718,14 +777,20 @@ const Checkout = () => {
     try {
       const url = isInstant ? `${API_BASE}/orders/instant` : `${API_BASE}/orders/place`;
       const body = isInstant
-        ? {
-            product_id: instantItem.productId,
-            quantity: instantItem.quantity,
-            shipping_address: shippingAddress,
-            billing_phone: billingPhone,
-            payment_method: paymentMethod || 'cod',
-            notes: orderNotes,
-          }
+        ? (() => {
+            const ib = {
+              product_id: instantItem.productId,
+              quantity: instantItem.quantity,
+              shipping_address: shippingAddress,
+              billing_phone: billingPhone,
+              payment_method: paymentMethod || 'cod',
+              notes: orderNotes,
+            };
+            if (instantItem.variant_id != null) {
+              ib.variant_id = Number(instantItem.variant_id);
+            }
+            return ib;
+          })()
         : {
             shipping_address: shippingAddress,
             billing_phone: billingPhone,
@@ -1046,20 +1111,30 @@ const Checkout = () => {
                     <span>Product</span>
                     <span>Total</span>
                   </div>
-                  {items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="checkout-order-row d-flex justify-content-between"
-                    >
-                      <span>
-                        {item.product ? item.product.name : 'Product'} x{' '}
-                        {item.quantity || 1}
-                      </span>
-                      <span>
-                        ₹{Number(item.itemTotal || 0).toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
+                  {items.map((item) => {
+                    const variantName = item.variant_name || (item.product && item.product.variant_name);
+                    return (
+                      <div
+                        key={item.id}
+                        className="checkout-order-row d-flex justify-content-between align-items-start"
+                      >
+                        <div className="d-flex flex-column">
+                          <span>
+                            {item.product ? item.product.name : 'Product'} x{' '}
+                            {item.quantity || 1}
+                          </span>
+                          {variantName && (
+                            <span className="mt-1">
+                              <Badge bg="secondary">{variantName}</Badge>
+                            </span>
+                          )}
+                        </div>
+                        <span>
+                          ₹{Number(item.itemTotal || 0).toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })}
                   {!items.length && !loading && (
                     <div className="checkout-order-row d-flex justify-content-between">
                       <span>Your cart is empty</span>

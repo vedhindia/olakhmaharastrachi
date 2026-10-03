@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Button, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Button, Alert, Form, Badge } from 'react-bootstrap';
 import { ShoppingBag, Eye, Heart, Star } from 'lucide-react';
 import './Product.css';
 
@@ -39,7 +39,7 @@ const getInitialWishlist = () => {
   }
 };
 
-const isProductInCart = async (token, productId) => {
+const isProductInCart = async (token, productId, variantId = null) => {
   const response = await fetch(`${API_BASE}/cart`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -51,6 +51,7 @@ const isProductInCart = async (token, productId) => {
   }
   const items = data && Array.isArray(data.items) ? data.items : [];
   const targetId = Number(productId);
+  const targetVariantId = variantId != null ? Number(variantId) : null;
   return items.some((item) => {
     const itemProductId =
       typeof item.product_id !== 'undefined'
@@ -58,7 +59,17 @@ const isProductInCart = async (token, productId) => {
         : item.product && typeof item.product.id !== 'undefined'
         ? Number(item.product.id)
         : NaN;
-    return !Number.isNaN(itemProductId) && itemProductId === targetId;
+    if (Number.isNaN(itemProductId) || itemProductId !== targetId) {
+      return false;
+    }
+    if (targetVariantId != null) {
+      const itemVariantId =
+        typeof item.variant_id !== 'undefined' && item.variant_id !== null
+          ? Number(item.variant_id)
+          : null;
+      return itemVariantId === targetVariantId;
+    }
+    return true;
   });
 };
 
@@ -70,6 +81,24 @@ const buildImageUrl = (imagePath) => {
   }
   const trimmed = imagePath.replace(/^\/+/, '');
   return `${API_BASE}/${trimmed}`;
+};
+
+const getUserTier = () => {
+  if (typeof localStorage === 'undefined') return 'retail';
+  if (localStorage.getItem('wholesalerToken')) return 'wholesale';
+  return 'retail';
+};
+
+const resolveTierPrice = (tier, retailPrice, wholesalePrice) => {
+  const r = retailPrice ? Number(retailPrice) : 0;
+  const w = wholesalePrice ? Number(wholesalePrice) : 0;
+  if (tier === 'wholesale') {
+    if (w > 0) return w;
+    if (r > 0) return r;
+    return 0;
+  }
+  if (r > 0) return r;
+  return 0;
 };
 
 const mapApiProductToView = (product) => {
@@ -86,43 +115,23 @@ const mapApiProductToView = (product) => {
     (product.category && product.category.category_name) ||
     product.category_name ||
     'CATEGORY';
+  const variant_type =
+    (product.category && product.category.variant_type) ||
+    product.variant_type ||
+    'none';
+  const variants = Array.isArray(product.variants) ? product.variants : [];
   const retailPrice = product.customer_price ? Number(product.customer_price) : 0;
   const wholesalePrice = product.wholesaler_price ? Number(product.wholesaler_price) : 0;
-  let price = retailPrice;
-  if (typeof localStorage !== 'undefined') {
-    const userToken = localStorage.getItem('userToken');
-    const wholesalerToken = localStorage.getItem('wholesalerToken');
-    if (wholesalerToken) {
-      if (wholesalePrice > 0) {
-        price = wholesalePrice;
-      } else if (retailPrice > 0) {
-        price = retailPrice;
-      } else {
-        price = 0;
-      }
-    } else if (userToken) {
-      if (retailPrice > 0) {
-        price = retailPrice;
-      } else {
-        price = 0;
-      }
-    } else if (retailPrice > 0) {
-      price = retailPrice;
-    } else if (wholesalePrice > 0) {
-      price = wholesalePrice;
-    } else {
-      price = 0;
-    }
-  } else if (retailPrice > 0) {
-    price = retailPrice;
-  } else if (wholesalePrice > 0) {
-    price = wholesalePrice;
-  } else {
-    price = 0;
-  }
+  const tier = getUserTier();
+  let price = resolveTierPrice(tier, retailPrice, wholesalePrice);
   const oldPrice = price > 0 ? price * 1.1 : 0;
   const discount =
     oldPrice > price && oldPrice > 0 ? `${Math.round(((oldPrice - price) / oldPrice) * 100)}% Off` : '';
+  const min_customer_price = product.min_customer_price != null ? Number(product.min_customer_price) : null;
+  const max_customer_price = product.max_customer_price != null ? Number(product.max_customer_price) : null;
+  const min_wholesaler_price = product.min_wholesaler_price != null ? Number(product.min_wholesaler_price) : null;
+  const max_wholesaler_price = product.max_wholesaler_price != null ? Number(product.max_wholesaler_price) : null;
+  const effective_stock = product.effective_stock != null ? Number(product.effective_stock) : (product.stock_quantity != null ? Number(product.stock_quantity) : 0);
 
   return {
     id: product.id,
@@ -135,6 +144,15 @@ const mapApiProductToView = (product) => {
     image: primaryImageUrl,
     images: allImageUrls,
     description: product.description || '',
+    variant_type,
+    variants,
+    base_retail_price: retailPrice,
+    base_wholesale_price: wholesalePrice,
+    min_customer_price,
+    max_customer_price,
+    min_wholesaler_price,
+    max_wholesaler_price,
+    effective_stock,
   };
 };
 
@@ -162,7 +180,42 @@ const ProductDetails = () => {
   const [newReviewComment, setNewReviewComment] = useState('');
   const [canSubmitReview, setCanSubmitReview] = useState(false);
   const [checkingReviewEligibility, setCheckingReviewEligibility] = useState(false);
+  const [selectedVariantId, setSelectedVariantId] = useState(null);
+  const [effectivePrice, setEffectivePrice] = useState(0);
+  const [effectiveStock, setEffectiveStock] = useState(0);
   const navigate = useNavigate();
+
+  const getActiveVariants = (p) => {
+    const list = p && Array.isArray(p.variants) ? p.variants : [];
+    return list.filter((v) => !v || !v.status || String(v.status).toLowerCase() === 'active');
+  };
+
+  const computeEffectiveForVariant = (p, variantId) => {
+    const tier = getUserTier();
+    const baseRetail = p && p.base_retail_price != null ? Number(p.base_retail_price) : 0;
+    const baseWholesale = p && p.base_wholesale_price != null ? Number(p.base_wholesale_price) : 0;
+    const baseStock = p && p.effective_stock != null ? Number(p.effective_stock) : 0;
+    if (variantId == null) {
+      const price = resolveTierPrice(tier, baseRetail, baseWholesale);
+      return { price, stock: baseStock };
+    }
+    const active = getActiveVariants(p);
+    const match = active.find((v) => Number(v.id) === Number(variantId));
+    if (!match) {
+      const price = resolveTierPrice(tier, baseRetail, baseWholesale);
+      return { price, stock: baseStock };
+    }
+    const vRetail = match.customer_price != null && match.customer_price !== '' ? Number(match.customer_price) : null;
+    const vWholesale = match.wholesaler_price != null && match.wholesaler_price !== '' ? Number(match.wholesaler_price) : null;
+    const vStock = match.stock != null && match.stock !== '' ? Number(match.stock) : null;
+    const price = resolveTierPrice(
+      tier,
+      vRetail != null && !Number.isNaN(vRetail) ? vRetail : baseRetail,
+      vWholesale != null && !Number.isNaN(vWholesale) ? vWholesale : baseWholesale,
+    );
+    const stock = vStock != null && !Number.isNaN(vStock) ? vStock : baseStock;
+    return { price, stock };
+  };
 
   const readJsonSafely = useCallback(async (res) => {
     const text = await res.text();
@@ -241,6 +294,19 @@ const ProductDetails = () => {
         setProduct(viewProduct);
         setActiveImageIndex(0);
         setQuantity(1);
+        const activeVariants = getActiveVariants(viewProduct);
+        if (viewProduct.variant_type !== 'none' && activeVariants.length > 0) {
+          const firstVariantId = activeVariants[0].id != null ? Number(activeVariants[0].id) : null;
+          setSelectedVariantId(firstVariantId);
+          const eff = computeEffectiveForVariant(viewProduct, firstVariantId);
+          setEffectivePrice(eff.price);
+          setEffectiveStock(eff.stock);
+        } else {
+          setSelectedVariantId(null);
+          const eff = computeEffectiveForVariant(viewProduct, null);
+          setEffectivePrice(eff.price);
+          setEffectiveStock(eff.stock);
+        }
         if (data && data.id) {
           fetchRelatedProducts(data);
         } else {
@@ -400,7 +466,7 @@ const ProductDetails = () => {
       return;
     }
     try {
-      const alreadyInCart = await isProductInCart(token, productId);
+      const alreadyInCart = await isProductInCart(token, productId, selectedVariantId);
       if (alreadyInCart) {
         const msg = 'This product is already in your cart';
         setActionMessage(msg);
@@ -413,13 +479,17 @@ const ProductDetails = () => {
         }
         return;
       }
+      const payload = { product_id: productId, quantity: qty };
+      if (selectedVariantId != null) {
+        payload.variant_id = Number(selectedVariantId);
+      }
       const response = await fetch(`${API_BASE}/cart/add`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ product_id: productId, quantity: qty }),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -479,13 +549,14 @@ const ProductDetails = () => {
     try {
       const quantityToUse = Number.isFinite(Number(qty)) && Number(qty) > 0 ? Number(qty) : 1;
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(
-          'instantPurchase',
-          JSON.stringify({
-            productId,
-            quantity: quantityToUse,
-          }),
-        );
+        const instantObj = {
+          productId,
+          quantity: quantityToUse,
+        };
+        if (selectedVariantId != null) {
+          instantObj.variant_id = Number(selectedVariantId);
+        }
+        localStorage.setItem('instantPurchase', JSON.stringify(instantObj));
       }
       const msg = 'Redirecting to checkout.';
       setActionMessage(msg);
@@ -623,20 +694,72 @@ const ProductDetails = () => {
                     </p>
                     <h2 className="product-name fw-bold mb-3">{product.name}</h2>
                     <div className="product-price d-flex align-items-center gap-2 mb-3">
-                      {product.oldPrice > 0 && (
+                      {effectivePrice > 0 && (
                         <span className="old-price text-muted text-decoration-line-through">
-                          ₹{product.oldPrice.toFixed(2)}
+                          ₹{(effectivePrice * 1.1).toFixed(2)}
                         </span>
                       )}
                       <span className="current-price fw-bold fs-4">
-                        ₹{product.price.toFixed(2)}
+                        ₹{effectivePrice.toFixed(2)}
                       </span>
+                      {product.variant_type !== 'none' && (
+                        (product.min_customer_price != null && product.max_customer_price != null) ||
+                        (product.min_wholesaler_price != null && product.max_wholesaler_price != null)
+                      ) && (
+                        <Badge bg="light" text="dark" className="border ms-2">
+                          {getUserTier() === 'wholesale'
+                            ? (product.min_wholesaler_price != null && product.max_wholesaler_price != null
+                                ? (product.min_wholesaler_price === product.max_wholesaler_price
+                                    ? `₹${product.min_wholesaler_price.toFixed(2)}`
+                                    : `₹${product.min_wholesaler_price.toFixed(2)} – ₹${product.max_wholesaler_price.toFixed(2)}`)
+                                : '')
+                            : (product.min_customer_price != null && product.max_customer_price != null
+                                ? (product.min_customer_price === product.max_customer_price
+                                    ? `₹${product.min_customer_price.toFixed(2)}`
+                                    : `₹${product.min_customer_price.toFixed(2)} – ₹${product.max_customer_price.toFixed(2)}`)
+                                : '')}
+                        </Badge>
+                      )}
                     </div>
                     {product.description && (
                       <p className="mb-4">
                         {product.description}
                       </p>
                     )}
+                    {product.variant_type !== 'none' && getActiveVariants(product).length > 0 && (
+                      <Form.Group className="mb-4">
+                        <Form.Label className="small fw-semibold text-muted">
+                          {product.variant_type === 'weight' ? 'Select Pack Weight' : 'Select Size'}
+                        </Form.Label>
+                        <Form.Select
+                          value={selectedVariantId != null ? selectedVariantId : ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const variantId = val === '' ? null : Number(val);
+                            setSelectedVariantId(variantId);
+                            const eff = computeEffectiveForVariant(product, variantId);
+                            setEffectivePrice(eff.price);
+                            setEffectiveStock(eff.stock);
+                            setQuantity(1);
+                          }}
+                          aria-label="Variant selector"
+                        >
+                          {getActiveVariants(product).map((v) => (
+                            <option key={v.id} value={Number(v.id)}>
+                              {v.variant_value}
+                            </option>
+                          ))}
+                        </Form.Select>
+                      </Form.Group>
+                    )}
+                    <div className="d-flex align-items-center gap-3 mb-3">
+                      <span className="small fw-semibold text-muted">
+                        In Stock:
+                      </span>
+                      <span className={`small fw-bold ${effectiveStock > 0 ? 'text-success' : 'text-danger'}`}>
+                        {effectiveStock > 0 ? `${effectiveStock} available` : 'Out of stock'}
+                      </span>
+                    </div>
                     <div className="d-flex align-items-center gap-3 mb-4">
                       <span className="small fw-semibold text-muted">
                         Quantity

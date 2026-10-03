@@ -1,7 +1,7 @@
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
-const { Order, Cart, CartItem, Product, OrderItem, Coupon, User, Wholesaler, Shipment } = require('../models');
+const { Order, Cart, CartItem, Product, OrderItem, Coupon, User, Wholesaler, Shipment, ProductVariant } = require('../models');
 const sequelize = require('../config/database');
 const { Op } = require('sequelize');
 const { createBorzoDeliveryOrder, calculateBorzoOrder } = require('../utils/borzoService');
@@ -612,7 +612,7 @@ exports.createRazorpayOrderInstant = async (req, res) => {
     }
     const userId = req.user.id;
     const userType = req.userType;
-    const { shipping_address, notes, billing_phone, phone, product_id, quantity } = req.body;
+    const { shipping_address, notes, billing_phone, phone, product_id, quantity, variant_id } = req.body;
 
     if (!shipping_address) {
       await t.rollback();
@@ -628,6 +628,9 @@ exports.createRazorpayOrderInstant = async (req, res) => {
       await t.rollback();
       return res.status(400).json({ message: 'Quantity must be a positive integer' });
     }
+    const normalizedVariantId =
+      variant_id != null && variant_id !== '' ? Number(variant_id) : null;
+    const hasVariant = normalizedVariantId != null && !Number.isNaN(normalizedVariantId);
 
     const product = await Product.findByPk(product_id, { transaction: t });
     if (!product) {
@@ -635,7 +638,35 @@ exports.createRazorpayOrderInstant = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    if (product.stock < qty) {
+    let variantSnapshot = null;
+    if (hasVariant) {
+      const pv = await ProductVariant.findByPk(normalizedVariantId, {
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+      if (!pv || Number(pv.product_id) !== Number(product_id)) {
+        await t.rollback();
+        return res
+          .status(400)
+          .json({ message: 'Selected size / pack is not available for this product' });
+      }
+      if (String(pv.status || 'active').toLowerCase() !== 'active') {
+        await t.rollback();
+        return res
+          .status(400)
+          .json({ message: 'Selected size / pack is currently unavailable' });
+      }
+      const pvStock = Number(pv.stock != null ? pv.stock : 0);
+      if (pvStock < qty) {
+        await t.rollback();
+        return res
+          .status(400)
+          .json({
+            message: `Insufficient stock for ${pv.variant_value}. Available: ${pvStock}`,
+          });
+      }
+      variantSnapshot = { id: pv.id, value: String(pv.variant_value || '') };
+    } else if (Number(product.stock) < qty) {
       await t.rollback();
       return res
         .status(400)
@@ -643,7 +674,22 @@ exports.createRazorpayOrderInstant = async (req, res) => {
     }
 
     let price = 0;
-    if (userType === 'wholesaler') {
+    if (hasVariant && variantSnapshot) {
+      const pv = await ProductVariant.findByPk(variantSnapshot.id, { transaction: t });
+      if (pv) {
+        if (userType === 'wholesaler') {
+          price =
+            pv.wholesaler_price != null && Number(pv.wholesaler_price) > 0
+              ? Number(pv.wholesaler_price)
+              : product.wholesaler_price || product.customer_price || 0;
+        } else {
+          price =
+            pv.customer_price != null && Number(pv.customer_price) > 0
+              ? Number(pv.customer_price)
+              : product.customer_price || product.wholesaler_price || 0;
+        }
+      }
+    } else if (userType === 'wholesaler') {
       price = product.wholesaler_price;
     } else {
       price = product.customer_price;
@@ -715,18 +761,28 @@ exports.createRazorpayOrderInstant = async (req, res) => {
 
     const order = await Order.create(orderData, { transaction: t });
 
-    await OrderItem.create(
-      {
-        order_id: order.id,
-        product_id: product.id,
-        product_name: product.name,
-        quantity: qty,
-        price: numericPrice,
-      },
-      { transaction: t },
-    );
+    const orderItemData = {
+      order_id: order.id,
+      product_id: product.id,
+      product_name: product.name,
+      quantity: qty,
+      price: numericPrice,
+    };
+    if (hasVariant && variantSnapshot) {
+      orderItemData.variant_id = variantSnapshot.id;
+      orderItemData.variant_name = variantSnapshot.value;
+    }
+    await OrderItem.create(orderItemData, { transaction: t });
 
-    await product.decrement('stock', { by: qty, transaction: t });
+    if (hasVariant && variantSnapshot) {
+      await ProductVariant.decrement('stock', {
+        by: qty,
+        where: { id: variantSnapshot.id },
+        transaction: t,
+      });
+    } else {
+      await product.decrement('stock', { by: qty, transaction: t });
+    }
 
     await t.commit();
 
