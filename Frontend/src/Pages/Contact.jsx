@@ -166,8 +166,8 @@ const Contact = () => {
               <div className="contact-map-card h-100">
                 <div className="contact-map-wrap">
                   <iframe
-                    title="Ashoka Location"
-                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3779.4233697122113!2d73.79744117394033!3d18.689854463983874!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bc2b70026cf1bad%3A0x845d2ddd0b0681c0!2sAshoka%20Products!5e0!3m2!1sen!2sin!4v1771675485814!5m2!1sen!2sin"
+                    title="Olakh Maharashtrachi Location"
+                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3779.4233697122113!2d73.79744117394033!3d18.689854463983874!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bc2b70026cf1bad%3A0x845d2ddd0b0681c0!2sOlakh%20Maharashtrachi!5e0!3m2!1sen!2sin!4v1771675485814!5m2!1sen!2sin"
                     loading="lazy"
                     referrerPolicy="no-referrer-when-downgrade"
                   />

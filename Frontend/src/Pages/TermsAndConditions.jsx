@@ -104,13 +104,13 @@ const TermsAndConditions = () => {
 
                   <h5 className="mt-4">9. Intellectual Property</h5>
                   <p className="mb-0">
-                    All content on the website (logos, text, graphics, and design) is owned by Ashoka or licensed to us.
+                    All content on the website (logos, text, graphics, and design) is owned by Olakh Maharashtrachi or licensed to us.
                     You may not copy or reuse content without permission.
                   </p>
 
                   <h5 className="mt-4">10. Limitation of Liability</h5>
                   <p className="mb-0">
-                    To the maximum extent permitted by law, Ashoka will not be liable for indirect or consequential
+                    To the maximum extent permitted by law, Olakh Maharashtrachi will not be liable for indirect or consequential
                     losses arising from the use of the website or products.
                   </p>
 
@@ -122,7 +122,7 @@ const TermsAndConditions = () => {
                   <h5 className="mt-4">12. Contact Us</h5>
                   <p className="mb-2">If you have any questions about these Terms, contact us:</p>
                   <div className="mb-1">
-                    <span className="fw-semibold">Ashoka</span>
+                    <span className="fw-semibold">Olakh Maharashtrachi</span>
                   </div>
                   <div className="text-muted">
                     GAT NO 1567, Near Shelar Crane Service Shelarvasti, Chikhali, Maharashtra – 411062

@@ -34,7 +34,7 @@ const ShippingDeliveryPolicy = () => {
                     </Button>
                   </div>
 
-                  <p>Thank you for shopping with Ashoka Products.</p>
+                  <p>Thank you for shopping with Olakh Maharashtrachi.</p>
 
                   <h5 className="mt-4">1. Order Processing</h5>
                   <ul>
@@ -74,7 +74,7 @@ const ShippingDeliveryPolicy = () => {
                   <h5 className="mt-4">7. Contact Us</h5>
                   <p className="mb-2">For shipping-related assistance, please contact:</p>
                   <div className="mb-1">
-                    <span className="fw-semibold">Ashoka Products</span>
+                    <span className="fw-semibold">Olakh Maharashtrachi</span>
                   </div>
                   <div className="text-muted">Email: ashokaproducts.sales@gmail.com</div>
                   <div className="text-muted">Phone: +91 99709 30890 / +91 88881 88194</div>

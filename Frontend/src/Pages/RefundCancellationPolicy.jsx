@@ -35,7 +35,7 @@ const RefundCancellationPolicy = () => {
                   </div>
 
                   <p>
-                    At Ashoka Products, we strive to provide high-quality products and excellent
+                    At Olakh Maharashtrachi, we strive to provide high-quality products and excellent
                     customer service. Please read our Refund &amp; Cancellation Policy carefully before
                     placing an order.
                   </p>
@@ -81,7 +81,7 @@ const RefundCancellationPolicy = () => {
                   <h5 className="mt-4">5. Contact Us</h5>
                   <p className="mb-2">For any refund or cancellation-related queries, please contact:</p>
                   <div className="mb-1">
-                    <span className="fw-semibold">Ashoka Products</span>
+                    <span className="fw-semibold">Olakh Maharashtrachi</span>
                   </div>
                   <div className="text-muted">Email: ashokaproducts.sales@gmail.com</div>
                   <div className="text-muted">
