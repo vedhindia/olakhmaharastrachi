@@ -14,7 +14,7 @@ process.on('unhandledRejection', (reason, promise) => {
 const app = require('./src/app');
 const sequelize = require('./src/config/database');
 const { Op } = require('sequelize');
-const { Coupon, Review, Product, User, Wholesaler, CommunicationLog, Category, ProductImage, Order } = require('./src/models');
+const { Coupon, Review, Product, User, Wholesaler, CommunicationLog, Category, ProductImage, Order, CartItem, OrderItem, ProductVariant } = require('./src/models');
 const fixProductImages = require('./scripts/fix_product_images');
 
 const PORT = process.env.PORT || 5000;
@@ -62,6 +62,27 @@ const initDbAndSeed = async () => {
       console.log('Wholesaler table synced.');
     } catch (wholesalerError) {
       console.error('Error syncing Wholesaler table:', wholesalerError.message);
+    }
+
+    try {
+      await CartItem.sync({ alter: true });
+      console.log('CartItem table synced (variant_id + variant_name columns ensured).');
+    } catch (cartItemError) {
+      console.error('Error syncing CartItem table:', cartItemError.message);
+    }
+
+    try {
+      await OrderItem.sync({ alter: true });
+      console.log('OrderItem table synced (variant_id + variant_name columns ensured).');
+    } catch (orderItemError) {
+      console.error('Error syncing OrderItem table:', orderItemError.message);
+    }
+
+    try {
+      await ProductVariant.sync({ alter: true });
+      console.log('ProductVariant table synced.');
+    } catch (productVariantError) {
+      console.error('Error syncing ProductVariant table:', productVariantError.message);
     }
 
     // Sync other models (non-destructive, no alter) to avoid User table index issues
