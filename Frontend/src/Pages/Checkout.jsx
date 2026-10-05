@@ -648,6 +648,30 @@ const Checkout = () => {
       });
       const createData = await createResponse.json();
       if (!createResponse.ok) {
+        if (createData.hint === 'Razorpay_credentials_mismatch' && !isInstant) {
+          setError(
+            (createData.message || 'Razorpay is currently unavailable.') +
+              ' Your order has not been charged. Payment method has been automatically switched to Cash on Delivery (COD) — you can click Place Order now.',
+          );
+          setMessage(
+            '⚠ Razorpay credentials in backend are currently misconfigured. Ask store admin to regenerate API Keys in dashboard.razorpay.com → Settings → API Keys. Switching to COD.',
+          );
+          setPaymentMethod('cod');
+          setPlacingOrder(false);
+          return;
+        }
+        if (createData.hint === 'Razorpay_credentials_mismatch' && isInstant) {
+          setError(
+          (createData.message || 'Razorpay is currently unavailable.') +
+            ' Your order has not been charged. Please switch Payment Method to Cash on Delivery (COD) using the radio button above, then click Place Order.',
+          );
+          setMessage(
+            '⚠ Razorpay credentials in backend are currently misconfigured. Ask store admin to regenerate API Keys at dashboard.razorpay.com → Settings → API Keys.',
+          );
+          setPaymentMethod('cod');
+          setPlacingOrder(false);
+          return;
+        }
         throw new Error(createData.message || 'Failed to initiate payment');
       }
       if (typeof window === 'undefined' || !window.Razorpay) {
