@@ -116,7 +116,9 @@ const Footer = () => {
                 <div className="contact-item">
                   <div className="contact-icon"><Mail size={16} /></div>
                   <div>
-                    <a href="mailto:omksarsatpute2006@gmail.com" className="text-decoration-none text-reset">omksarsatpute2006@gmail.com</a>
+                    <a href="mailto:olakhmaharashtrachi2026@gmail.com
+" className="text-decoration-none text-reset">olakhmaharashtrachi2026@gmail.com
+</a>
                   </div>
                 </div>
               </div>
