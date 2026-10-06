@@ -193,7 +193,8 @@ const Contact = () => {
                   <div className="contact-info-line">
                     <Mail size={18} />
                     <span>
-                      omksarsatpute2006@gmail.com
+                      olakhmaharashtrachi2026@gmail.com
+
                     </span>
                   </div>
                   <div className="contact-info-line">
