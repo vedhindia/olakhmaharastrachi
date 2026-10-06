@@ -517,26 +517,6 @@ const Product = () => {
                     </div>
                     
                     <div className="product-info border-top pt-4">
-                      {/* Screenshot style: TWO LINES: (1) literal uppercase label CATEGORY maroon (2) actual name (3) product name */}
-                      <div className="mb-2 text-center">
-                        <span
-                          className="text-uppercase small fw-bold"
-                          style={{
-                            letterSpacing: '0.05em',
-                            color: 'rgb(139, 0, 0)',
-                            display: 'block',
-                            lineHeight: '1.2',
-                          }}
-                        >
-                          {product.categoryLabel}
-                        </span>
-                        <span
-                          className="d-block mt-1 fw-semibold"
-                          style={{ color: 'rgb(20, 20, 20)' }}
-                        >
-                          {product.categoryName}
-                        </span>
-                      </div>
                       <h5 className="product-name fw-bold mb-3">{product.name}</h5>
                       <div className="product-price d-flex justify-content-center gap-2">
                         {product.oldPrice > 0 && (
