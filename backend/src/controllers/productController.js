@@ -483,8 +483,15 @@ exports.getAllProducts = async (req, res) => {
       const images = Array.isArray(p.images) ? p.images : [];
       const primary = images.find(i => i.is_primary) || images[0] || null;
       const variants = Array.isArray(p.variants) ? p.variants : [];
+      // Build nested category object to match frontend mapper contract: product.category.category_name
+      const catObj = p.cat_id ? {
+        id: Number(p.cat_id),
+        category_name: p.category_name || '',
+        slug: p.category_slug || null,
+      } : null;
       return {
         ...p,
+        category: catObj,
         product_name: p.name,            // legacy alias
         stock_quantity: p.effective_stock ?? p.stock,         // legacy alias (now = effective stock across variants)
         main_image: primary ? primary.image_url : null, // used by table thumbnail
