@@ -3,9 +3,9 @@ import { Container, Row, Col, Button, Carousel, Nav, Alert, Spinner } from 'reac
 import { ChevronRight, ChevronLeft, Wheat, Box, Container as PackageIcon, Layers, ShoppingBag, Star, Heart, Eye, Leaf, Award, ShieldCheck, Quote } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import productImg from '../assets/images/product 5.png';
-import banner1 from '../assets/images/banner 1.jpg';
-import banner2 from '../assets/images/banner 2.jpg';
-import banner3 from '../assets/images/banner 3.jpg';
+import banner1 from '../assets/images/BANNER 1.jpg';
+import banner2 from '../assets/images/BANNER 2.jpg';
+import banner3 from '../assets/images/BANNER 3.jpg';
 import Footer from '../Components/Footer';
 import './Home.css';
 import bg from '../assets/images/bg.png';
