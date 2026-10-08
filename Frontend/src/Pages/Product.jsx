@@ -119,6 +119,8 @@ const mapApiProductToView = (product) => {
   return {
     id: product.id,
     name: product.name,
+    categoryLabel: 'CATEGORY',
+    categoryName: categoryName,
     category: categoryName.toUpperCase(),
     price,
     oldPrice,
@@ -515,7 +517,6 @@ const Product = () => {
                     </div>
                     
                     <div className="product-info border-top pt-4">
-                      <p className="product-category text-uppercase small fw-bold mb-2">{product.category}</p>
                       <h5 className="product-name fw-bold mb-3">{product.name}</h5>
                       <div className="product-price d-flex justify-content-center gap-2">
                         {product.oldPrice > 0 && (

@@ -339,7 +339,8 @@ const Navbar = () => {
           </div>
           <div className="top-bar-center  small d-none d-md-block">
             EMAIL:{' '}
-            <span className="fw-bold">omksarsatpute2006@gmail.com</span>
+            <span className="fw-bold">olakhmaharashtrachi2026@gmail.com
+</span>
           </div>
           <div className="top-bar-right d-flex gap-3 small">
             <label className="language-selector d-flex align-items-center gap-2">

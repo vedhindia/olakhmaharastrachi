@@ -101,6 +101,12 @@ const mapApiProductToCard = (product) => {
   const images = product.images || [];
   const primaryImage = images.find((img) => img.is_primary) || images[0];
   const imageUrl = primaryImage ? buildImageUrl(primaryImage.image_url) : FALLBACK_CARD_IMAGE;
+  const categoryName =
+    product.category && product.category.category_name
+      ? product.category.category_name
+      : product.category_name
+        ? String(product.category_name)
+        : 'General';
   const retailPrice = product.customer_price ? Number(product.customer_price) : 0;
   const wholesalePrice = product.wholesaler_price ? Number(product.wholesaler_price) : 0;
   let price = retailPrice;
@@ -142,6 +148,8 @@ const mapApiProductToCard = (product) => {
   return {
     id: product.id,
     name: product.name,
+    categoryLabel: 'CATEGORY',
+    categoryName,
     price,
     oldPrice,
     badge,
