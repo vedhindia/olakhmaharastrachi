@@ -34,76 +34,86 @@ const startHttpServer = () => {
 const initDbAndSeed = async () => {
   await sequelize.authenticate();
   console.log('Database connected successfully.');
-    
-    // Sync Category model specifically to add the new image column
-    try {
-      await Category.sync({ alter: true });
-      console.log('Category table synced.');
-    } catch (catError) {
-      console.error('Error syncing Category table:', catError.message);
-    }
 
-    try {
-      await Order.sync({ alter: true });
-      console.log('Order table synced.');
-    } catch (orderError) {
-      console.error('Error syncing Order table:', orderError.message);
-    }
+  if (process.env.NODE_ENV === 'production') {
+    console.log(
+      'Production mode: skipping automatic schema sync and demo seed tasks.'
+    );
 
-    try {
-      await User.sync({ alter: true });
-      console.log('User table synced.');
-    } catch (userError) {
-      console.error('Error syncing User table:', userError.message);
-    }
-
-    try {
-      await Wholesaler.sync({ alter: true });
-      console.log('Wholesaler table synced.');
-    } catch (wholesalerError) {
-      console.error('Error syncing Wholesaler table:', wholesalerError.message);
-    }
-
-    try {
-      await CartItem.sync({ alter: true });
-      console.log('CartItem table synced (variant_id + variant_name columns ensured).');
-    } catch (cartItemError) {
-      console.error('Error syncing CartItem table:', cartItemError.message);
-    }
-
-    try {
-      await OrderItem.sync({ alter: true });
-      console.log('OrderItem table synced (variant_id + variant_name columns ensured).');
-    } catch (orderItemError) {
-      console.error('Error syncing OrderItem table:', orderItemError.message);
-    }
-
-    try {
-      await ProductVariant.sync({ alter: true });
-      console.log('ProductVariant table synced.');
-    } catch (productVariantError) {
-      console.error('Error syncing ProductVariant table:', productVariantError.message);
-    }
-
-    // Sync other models (non-destructive, no alter) to avoid User table index issues
-    await sequelize.sync();
-    console.log('Database synced.');
-
-    // Set DB ready flag immediately after sync to allow API access
     dbInitialized = true;
     app.locals.dbReady = true;
+    return;
+  }
 
-    // Run fixProductImages to correct any mismatched images in the database
-    // This ensures that even if seed data was wrong, it gets corrected on startup
-    try {
-      await fixProductImages();
-    } catch (fixError) {
-      console.error('Image fix script failed:', fixError);
-    }
+  // Sync Category model specifically to add the new image column
+  try {
+    await Category.sync({ alter: true });
+    console.log('Category table synced.');
+  } catch (catError) {
+    console.error('Error syncing Category table:', catError.message);
+  }
 
-    // Seed dummy coupons if none exist
-    try {
-      const count = await Coupon.count();
+  try {
+    await Order.sync({ alter: true });
+    console.log('Order table synced.');
+  } catch (orderError) {
+    console.error('Error syncing Order table:', orderError.message);
+  }
+
+  try {
+    await User.sync({ alter: true });
+    console.log('User table synced.');
+  } catch (userError) {
+    console.error('Error syncing User table:', userError.message);
+  }
+
+  try {
+    await Wholesaler.sync({ alter: true });
+    console.log('Wholesaler table synced.');
+  } catch (wholesalerError) {
+    console.error('Error syncing Wholesaler table:', wholesalerError.message);
+  }
+
+  try {
+    await CartItem.sync({ alter: true });
+    console.log('CartItem table synced (variant_id + variant_name columns ensured).');
+  } catch (cartItemError) {
+    console.error('Error syncing CartItem table:', cartItemError.message);
+  }
+
+  try {
+    await OrderItem.sync({ alter: true });
+    console.log('OrderItem table synced (variant_id + variant_name columns ensured).');
+  } catch (orderItemError) {
+    console.error('Error syncing OrderItem table:', orderItemError.message);
+  }
+
+  try {
+    await ProductVariant.sync({ alter: true });
+    console.log('ProductVariant table synced.');
+  } catch (productVariantError) {
+    console.error('Error syncing ProductVariant table:', productVariantError.message);
+  }
+
+  // Sync other models (non-destructive, no alter) to avoid User table index issues
+  await sequelize.sync();
+  console.log('Database synced.');
+
+  // Set DB ready flag immediately after sync to allow API access
+  dbInitialized = true;
+  app.locals.dbReady = true;
+
+  // Run fixProductImages to correct any mismatched images in the database
+  // This ensures that even if seed data was wrong, it gets corrected on startup
+  try {
+    await fixProductImages();
+  } catch (fixError) {
+    console.error('Image fix script failed:', fixError);
+  }
+
+  // Seed dummy coupons if none exist
+  try {
+    const count = await Coupon.count();
       if (count === 0) {
         await Coupon.bulkCreate([
           {
