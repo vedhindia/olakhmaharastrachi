@@ -1,5 +1,5 @@
 
-name: Maharashtrachi Olakh CI
+name: Maharashtrachi Olakh CI/CD
 
 on:
   push:
@@ -14,8 +14,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: maharashtrachi-olakh-ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: maharashtrachi-olakh-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -36,7 +36,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check backend entry-point syntax
+      - name: Check backend syntax
         run: node --check backend/index.js
 
       - name: Build public website
@@ -49,9 +49,9 @@ jobs:
         run: |
           test -s Frontend/dist/index.html
           test -s admin-panel/dist/index.html
-          echo "Both frontend build outputs exist."
+          echo "Both frontend builds exist."
 
-      - name: Upload website build
+      - name: Upload public website artifact
         uses: actions/upload-artifact@v4
         with:
           name: public-website-dist
@@ -59,10 +59,118 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload admin build
+      - name: Upload admin panel artifact
         uses: actions/upload-artifact@v4
         with:
           name: admin-panel-dist
           path: admin-panel/dist/
           if-no-files-found: error
           retention-days: 7
+
+  deploy:
+    name: Deploy frontend to VPS
+    needs: build
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+
+    steps:
+      - name: Download public website artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: public-website-dist
+          path: release/public
+
+      - name: Download admin panel artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: admin-panel-dist
+          path: release/admin
+
+      - name: Verify downloaded artifacts
+        run: |
+          test -s release/public/index.html
+          test -s release/admin/index.html
+
+      - name: Configure SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -eu
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+
+          printf '%s\n' "$VPS_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Prepare remote staging directories
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -eu
+          ssh -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            'mkdir -p "$HOME/staging/public" "$HOME/staging/admin"'
+
+      - name: Transfer public website artifact
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          scp -r -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            release/public/. \
+            "$VPS_USER@$VPS_HOST:staging/public/"
+
+      - name: Transfer admin panel artifact
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          scp -r -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            release/admin/. \
+            "$VPS_USER@$VPS_HOST:staging/admin/"
+
+      - name: Publish frontend artifacts
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            'sudo -n /usr/local/sbin/deploy-maharashtrachiolakh-frontend'
+
+      - name: Verify live public website
+        run: |
+          curl --fail --silent --show-error \
+            --retry 3 --retry-delay 2 \
+            --output /dev/null \
+            https://maharashtrachiolakh.com/
+
+      - name: Verify live admin panel
+        run: |
+          curl --fail --silent --show-error \
+            --retry 3 --retry-delay 2 \
+            --output /dev/null \
+            https://maharashtrachiolakh.com/admin/
+
+      - name: Verify live API health
+        run: |
+          curl --fail --silent --show-error \
+            --retry 3 --retry-delay 2 \
+            https://maharashtrachiolakh.com/api/health
