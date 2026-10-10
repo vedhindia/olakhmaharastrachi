@@ -1,0 +1,68 @@
+
+name: Maharashtrachi Olakh CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maharashtrachi-olakh-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Install, check and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check backend entry-point syntax
+        run: node --check backend/index.js
+
+      - name: Build public website
+        run: npm run build:ashoka
+
+      - name: Build admin panel
+        run: npm run build:admin
+
+      - name: Verify build outputs
+        run: |
+          test -s Frontend/dist/index.html
+          test -s admin-panel/dist/index.html
+          echo "Both frontend build outputs exist."
+
+      - name: Upload website build
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-website-dist
+          path: Frontend/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload admin build
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-panel-dist
+          path: admin-panel/dist/
+          if-no-files-found: error
+          retention-days: 7
