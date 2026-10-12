@@ -5,16 +5,13 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: maharashtrachi-olakh-${{ github.ref }}
+  group: maharashtrachi-olakh-production
   cancel-in-progress: false
 
 jobs:
@@ -47,9 +44,11 @@ jobs:
 
       - name: Verify build outputs
         run: |
+          set -eu
           test -s Frontend/dist/index.html
           test -s admin-panel/dist/index.html
           echo "Both frontend builds exist."
+          echo "Commit being built: $GITHUB_SHA"
 
       - name: Upload public website artifact
         uses: actions/upload-artifact@v4
@@ -71,8 +70,9 @@ jobs:
     name: Deploy frontend to VPS
     needs: build
     if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' ||
+       github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production
@@ -92,6 +92,7 @@ jobs:
 
       - name: Verify downloaded artifacts
         run: |
+          set -eu
           test -s release/public/index.html
           test -s release/admin/index.html
 
@@ -110,7 +111,7 @@ jobs:
           printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
 
-      - name: Prepare remote staging directories
+      - name: Prepare clean remote staging directories
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -120,13 +121,17 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" \
-            'mkdir -p "$HOME/staging/public" "$HOME/staging/admin"'
+            'set -eu
+             mkdir -p "$HOME/staging/public" "$HOME/staging/admin"
+             find "$HOME/staging/public" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+             find "$HOME/staging/admin" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +'
 
       - name: Transfer public website artifact
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
+          set -eu
           scp -r -i "$HOME/.ssh/deploy_key" \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
@@ -138,6 +143,7 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
+          set -eu
           scp -r -i "$HOME/.ssh/deploy_key" \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
@@ -149,6 +155,7 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
+          set -eu
           ssh -i "$HOME/.ssh/deploy_key" \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
@@ -157,20 +164,24 @@ jobs:
 
       - name: Verify live public website
         run: |
+          set -eu
           curl --fail --silent --show-error \
             --retry 3 --retry-delay 2 \
             --output /dev/null \
-            https://maharashtrachiolakh.com/
+            "https://maharashtrachiolakh.com/?deploy=${GITHUB_SHA}"
 
       - name: Verify live admin panel
         run: |
+          set -eu
           curl --fail --silent --show-error \
             --retry 3 --retry-delay 2 \
             --output /dev/null \
-            https://maharashtrachiolakh.com/admin/
+            "https://maharashtrachiolakh.com/admin/?deploy=${GITHUB_SHA}"
 
       - name: Verify live API health
         run: |
+          set -eu
           curl --fail --silent --show-error \
             --retry 3 --retry-delay 2 \
             https://maharashtrachiolakh.com/api/health
+          echo
