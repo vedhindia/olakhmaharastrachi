@@ -380,6 +380,28 @@ const hasRazorpayConfig =
   isValidRazorpayValue(process.env.RAZORPAY_KEY_ID) &&
   isValidRazorpayValue(process.env.RAZORPAY_KEY_SECRET);
 
+if (hasRazorpayConfig) {
+  try {
+    const kid = process.env.RAZORPAY_KEY_ID || '';
+    const mode = kid.startsWith('rzp_live_') ? 'LIVE' : kid.startsWith('rzp_test_') ? 'TEST' : 'UNKNOWN';
+    const masked = kid.length >= 8 ? `${kid.slice(0, 6)}••${kid.slice(-4)}` : '••••••';
+    console.log(`[Razorpay] Config loaded: mode=${mode} key_id=${masked}`);
+  } catch (_) {}
+}
+
+const isRazorpayAuthError = (err) => {
+  if (!err) return false;
+  if (err.statusCode === 401) return true;
+  const desc = (err.error && err.error.description) ? String(err.error.description).toLowerCase() : '';
+  if (desc.includes('authentication failed')) return true;
+  const msg = typeof err.message === 'string' ? err.message.toLowerCase() : '';
+  if (msg.includes('authentication failed') || msg.includes('401')) return true;
+  return false;
+};
+
+const RAZORPAY_GENERIC_UNAVAILABLE =
+  'Online payments via Razorpay are temporarily unavailable right now. Please choose Cash on Delivery (COD), try again in a few minutes, or contact store support for assistance.';
+
 const razorpay = hasRazorpayConfig
   ? new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID,
@@ -421,10 +443,13 @@ exports.createRazorpayOrder = async (req, res) => {
         {
           model: CartItem,
           as: 'items',
-          include: [{ model: Product, as: 'product' }]
-        }
+          include: [
+            { model: Product, as: 'product' },
+            { model: ProductVariant, as: 'variant' },
+          ],
+        },
       ],
-      transaction: t
+      transaction: t,
     });
 
     if (!cart || !cart.items || cart.items.length === 0) {
@@ -437,21 +462,42 @@ exports.createRazorpayOrder = async (req, res) => {
     const orderItemsData = [];
 
     for (const item of cart.items) {
-      if (item.product.stock < item.quantity) {
+      const variant = item.variant || null;
+      const hasVariant = variant && variant.id != null;
+      if (hasVariant) {
+        if (String(variant.status || 'active').toLowerCase() !== 'active') {
+          await t.rollback();
+          return res.status(400).json({
+            message: `Pack / Size ${variant.variant_value} for ${item.product.name} is currently unavailable.`,
+          });
+        }
+        const vStock = Number(variant.stock ?? 0);
+        if (vStock < item.quantity) {
+          await t.rollback();
+          return res.status(400).json({
+            message: `Insufficient stock for ${item.product.name} (${variant.variant_value}). Available: ${vStock}`,
+          });
+        }
+      } else if (item.product.stock < item.quantity) {
         await t.rollback();
-        return res.status(400).json({ 
-          message: `Insufficient stock for product: ${item.product.name}. Available: ${item.product.stock}` 
+        return res.status(400).json({
+          message: `Insufficient stock for product: ${item.product.name}. Available: ${item.product.stock}`,
         });
       }
       const itemTotal = parseFloat(item.price) * item.quantity;
       totalAmount += itemTotal;
-      
-      orderItemsData.push({
+
+      const row = {
         product_id: item.product_id,
         product_name: item.product.name,
         quantity: item.quantity,
-        price: item.price
-      });
+        price: item.price,
+      };
+      if (hasVariant) {
+        row.variant_id = Number(variant.id);
+        row.variant_name = String(item.variant_name ?? variant.variant_value ?? '');
+      }
+      orderItemsData.push(row);
     }
 
     // Apply coupon if provided
@@ -560,14 +606,27 @@ exports.createRazorpayOrder = async (req, res) => {
     // If payment fails, we might need a cleanup job or rollback logic. 
     // For simplicity, we'll deduct now and if payment verify fails/never happens, admin can cancel or auto-cancel.
     for (const itemData of orderItemsData) {
-      await OrderItem.create({
-        ...itemData,
-        order_id: order.id
-      }, { transaction: t });
-      
-      // Deduct stock
-      const product = await Product.findByPk(itemData.product_id, { transaction: t });
-      await product.decrement('stock', { by: itemData.quantity, transaction: t });
+      await OrderItem.create(
+        {
+          ...itemData,
+          order_id: order.id,
+        },
+        { transaction: t },
+      );
+
+      // Deduct stock — variant-level if applicable
+      if (itemData.variant_id) {
+        await ProductVariant.decrement('stock', {
+          by: itemData.quantity,
+          where: { id: Number(itemData.variant_id) },
+          transaction: t,
+        });
+      } else {
+        const product = await Product.findByPk(itemData.product_id, { transaction: t });
+        if (product) {
+          await product.decrement('stock', { by: itemData.quantity, transaction: t });
+        }
+      }
     }
 
     // 6. Clear Cart
@@ -596,6 +655,13 @@ exports.createRazorpayOrder = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('Create Razorpay order error:', error);
+    if (isRazorpayAuthError(error)) {
+      console.error('  → Cause: RAZORPAY API REJECTED AUTHENTICATION. The key_id/key_secret in .env are INVALID, disabled, or revoked. Verify in Razorpay Dashboard → Settings → API Keys.');
+      return res.status(503).json({
+        message: RAZORPAY_GENERIC_UNAVAILABLE,
+        hint: 'Razorpay_credentials_mismatch',
+      });
+    }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -798,6 +864,13 @@ exports.createRazorpayOrderInstant = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error('Create instant Razorpay order error:', error);
+    if (isRazorpayAuthError(error)) {
+      console.error('  → Cause: RAZORPAY API REJECTED AUTHENTICATION (instant purchase mode). Key_id/key_secret in .env are INVALID, disabled, or revoked.');
+      return res.status(503).json({
+        message: RAZORPAY_GENERIC_UNAVAILABLE,
+        hint: 'Razorpay_credentials_mismatch',
+      });
+    }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -877,9 +950,29 @@ exports.verifyPayment = async (req, res) => {
       if (order) {
         order.payment_status = 'failed';
         await order.save();
-        
-        // Ideally: Restore stock if we want to fail strictly
-        // For now, just mark as failed payment
+
+        try {
+          const items = await OrderItem.findAll({ where: { order_id: order.id } });
+          for (const item of items) {
+            const qty = Number(item.quantity || 0);
+            if (qty <= 0) continue;
+            if (item.variant_id) {
+              try {
+                await ProductVariant.increment('stock', {
+                  by: qty,
+                  where: { id: Number(item.variant_id) },
+                });
+              } catch (_) {}
+            } else {
+              try {
+                await Product.increment('stock', {
+                  by: qty,
+                  where: { id: Number(item.product_id) },
+                });
+              } catch (_) {}
+            }
+          }
+        } catch (_) {}
       }
       res.status(400).json({ message: 'Invalid signature, payment verification failed' });
     }
