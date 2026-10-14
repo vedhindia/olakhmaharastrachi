@@ -18,10 +18,10 @@ const journeySteps = [
 ];
 
 const diffCards = [
-  { icon: "🌾", title: "Farm-Sourced Ingredients", desc: "Best grains harvested from top farms" },
-  { icon: "🔍", title: "Quality Tested & Certified", desc: "Rigorous quality checks for purity" },
-  { icon: "⚙️", title: "Modern Processing", desc: "Advanced facilities ensure hygiene" },
-  { icon: "💚", title: "Customer-First Approach", desc: "Your needs and feedback matter most." },
+  { icon: "🌾", title: "Traditional Maharashtrian Products", desc: "Discover authentic sweets, snacks, and regional specialities." },
+  { icon: "🔍", title: "Authentic Taste & Quality", desc: "Celebrating genuine flavours rooted in Maharashtra’s heritage." },
+  { icon: "⚙️", title: "Traditional Recipes & Craft", desc: "Preserving age-old recipes and culinary traditions." },
+  { icon: "💚", title: "Customer-Centric Approach", desc: "Sharing our rich food culture and flavours with every generation.." },
 ];
 
 export default function About() {
@@ -43,13 +43,14 @@ export default function About() {
             <Col md={6}>
               <div className="who__text">
                 <h2 className="section-title">Who We Are</h2>
+                <h5>Maharashtrachi Olakh – A Taste of Tradition, A Celebration of Heritage.
+
+</h5>
                 <p>
-                 We are a quality-focused food brand committed to preserving the authentic taste of Indian kitchens. Specializing in premium Chana Besan (Gram Flour), we use only 100% desi chickpeas, carefully sourced and processed using traditional slow-grinding methods to retain their natural aroma, rich nutty flavor, and nutritional value.
-                </p>
+Maharashtra is a land of rich traditions, vibrant culture, and unforgettable flavours. At Maharashtrachi Olakh, we celebrate the authentic taste of Maharashtra through its traditional sweets, delicious snacks, and aromatic spices.                </p>
                 <p >
-                 For us, chana besan is more than just an ingredient—it is the golden foundation of everyday cooking. Our product is pure and unadulterated, made with zero fillers, zero additives, and no preservatives, ensuring consistent quality and trust in every pack.
-                </p>
-                <p>Naturally rich in plant-based protein, dietary fiber, and iron, our besan supports both taste and nutrition. Its fine texture and versatility make it ideal for crispy pakoras, smooth kadhi, fluffy dhokla, and melt-in-the-mouth sweets.</p>
+From the sweetness of festive delicacies to the distinctive flavours of traditional Maharashtrian cuisine, we aim to preserve and showcase the culinary heritage that connects generations. Every flavour tells a story, every recipe carries a tradition, and every taste reflects the true spirit of Maharashtra.                </p>
+                <p>Our mission is to bring the authentic essence of Maharashtrian food culture closer to people and introduce its timeless culinary treasures to a wider audience.</p>
               </div>
             </Col>
             <Col md={6}>
@@ -66,20 +67,7 @@ export default function About() {
         </Container>
       </section>
 
-      {/* ── Our Journey ── */}
-      <section className="journey">
-        <h2 className="section-title">Our Journey</h2>
-        <div className="journey__track">
-          <div className="journey__line" />
-          {journeySteps.map((s, i) => (
-            <div className="journey__step" key={i}>
-              <div className="journey__circle">{s.icon}</div>
-              <h4 className="journey__step-title">{s.title}</h4>
-              <p className="journey__step-desc">{s.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+    
 
       <section className="vm">
         <h2 className="section-title with-line">Vision & Mission</h2>
@@ -87,16 +75,15 @@ export default function About() {
           <div className="vm__card">
             <h3 className="vm__title">Vision</h3>
             <p>
-              To be India’s most trusted food products brand, connecting homes with pure,
-              naturally processed ingredients that nourish families every day.
+              To become a trusted destination for discovering and celebrating Maharashtra’s authentic culinary heritage, preserving traditional flavours, and sharing the richness of Maharashtrian food culture with future generations across India and beyond.
             </p>
           </div>
           <div className="vm__card">
             <h3 className="vm__title">Mission</h3>
             <ul className="vm__list">
-              <li>Adopt rigorous sourcing and quality practices.</li>
-              <li>Maintain hygienic processing and modern packaging.</li>
-              <li>Continuously improve with a customer‑first mindset.</li>
+              <li>Preserve Tradition: Celebrate and protect Maharashtra’s authentic recipes, food traditions, and culinary heritage.</li>
+              <li>Promote Authentic Flavours: Showcase traditional sweets, snacks, spices, and regional specialities.</li>
+              <li>Connect Generations: Keep the taste and memories of Maharashtrian cuisine alive for future generations.</li>
             </ul>
           </div>
         </div>
