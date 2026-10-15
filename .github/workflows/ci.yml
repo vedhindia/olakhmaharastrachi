@@ -45,9 +45,18 @@ jobs:
       - name: Verify build outputs
         run: |
           set -eu
+
           test -s Frontend/dist/index.html
           test -s admin-panel/dist/index.html
-          echo "Both frontend builds exist."
+
+          echo "Public website build:"
+          du -sh Frontend/dist
+          find Frontend/dist -type f | wc -l
+
+          echo "Admin panel build:"
+          du -sh admin-panel/dist
+          find admin-panel/dist -type f | wc -l
+
           echo "Commit being built: $GITHUB_SHA"
 
       - name: Upload public website artifact
@@ -74,7 +83,7 @@ jobs:
       (github.event_name == 'push' ||
        github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     environment: production
 
     steps:
@@ -93,8 +102,15 @@ jobs:
       - name: Verify downloaded artifacts
         run: |
           set -eu
+
           test -s release/public/index.html
           test -s release/admin/index.html
+
+          echo "Downloaded public website:"
+          du -sh release/public
+
+          echo "Downloaded admin panel:"
+          du -sh release/admin
 
       - name: Configure SSH
         env:
@@ -102,6 +118,10 @@ jobs:
           VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
           set -eu
+
+          test -n "$VPS_SSH_KEY"
+          test -n "$VPS_KNOWN_HOSTS"
+
           mkdir -p "$HOME/.ssh"
           chmod 700 "$HOME/.ssh"
 
@@ -111,44 +131,109 @@ jobs:
           printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
 
-      - name: Prepare clean remote staging directories
+      - name: Test VPS SSH connection
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           set -eu
-          ssh -i "$HOME/.ssh/deploy_key" \
+
+          test -n "$VPS_HOST"
+          test -n "$VPS_USER"
+
+          ssh \
+            -i "$HOME/.ssh/deploy_key" \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=20 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=6 \
             "$VPS_USER@$VPS_HOST" \
             'set -eu
-             mkdir -p "$HOME/staging/public" "$HOME/staging/admin"
-             find "$HOME/staging/public" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-             find "$HOME/staging/admin" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +'
+             printf "SSH connection successful\n"
+             printf "Remote user: "
+             id -un
+             printf "Remote rsync: "
+             command -v rsync
+             mkdir -p "$HOME/staging/public" "$HOME/staging/admin"'
 
-      - name: Transfer public website artifact
+      - name: Transfer public website using rsync
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           set -eu
-          scp -r -i "$HOME/.ssh/deploy_key" \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            release/public/. \
+
+          echo "Starting public website transfer..."
+
+          rsync \
+            -az \
+            --delete \
+            --partial \
+            --human-readable \
+            --stats \
+            --info=progress2 \
+            --timeout=180 \
+            -e "ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6" \
+            release/public/ \
             "$VPS_USER@$VPS_HOST:staging/public/"
 
-      - name: Transfer admin panel artifact
+          echo "Public website transfer completed."
+
+      - name: Transfer admin panel using rsync
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           set -eu
-          scp -r -i "$HOME/.ssh/deploy_key" \
+
+          echo "Starting admin panel transfer..."
+
+          rsync \
+            -az \
+            --delete \
+            --partial \
+            --human-readable \
+            --stats \
+            --info=progress2 \
+            --timeout=180 \
+            -e "ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6" \
+            release/admin/ \
+            "$VPS_USER@$VPS_HOST:staging/admin/"
+
+          echo "Admin panel transfer completed."
+
+      - name: Validate both remote staging builds
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -eu
+
+          ssh \
+            -i "$HOME/.ssh/deploy_key" \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
-            release/admin/. \
-            "$VPS_USER@$VPS_HOST:staging/admin/"
+            -o ConnectTimeout=20 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=6 \
+            "$VPS_USER@$VPS_HOST" \
+            'set -eu
+             PUBLIC_DIR="$HOME/staging/public"
+             ADMIN_DIR="$HOME/staging/admin"
+
+             test -s "$PUBLIC_DIR/index.html"
+             test -s "$ADMIN_DIR/index.html"
+
+             echo "Public staging validation passed."
+             du -sh "$PUBLIC_DIR"
+             find "$PUBLIC_DIR" -type f | wc -l
+
+             echo "Admin staging validation passed."
+             du -sh "$ADMIN_DIR"
+             find "$ADMIN_DIR" -type f | wc -l
+
+             echo "Both staging builds are ready to publish."'
 
       - name: Publish frontend artifacts
         env:
@@ -156,32 +241,64 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           set -eu
-          ssh -i "$HOME/.ssh/deploy_key" \
+
+          ssh \
+            -i "$HOME/.ssh/deploy_key" \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=20 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=6 \
             "$VPS_USER@$VPS_HOST" \
             'sudo -n /usr/local/sbin/deploy-maharashtrachiolakh-frontend'
 
       - name: Verify live public website
         run: |
           set -eu
-          curl --fail --silent --show-error \
-            --retry 3 --retry-delay 2 \
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 5 \
+            --retry-delay 3 \
+            --retry-connrefused \
+            --max-time 30 \
             --output /dev/null \
             "https://maharashtrachiolakh.com/?deploy=${GITHUB_SHA}"
+
+          echo "Public website returned a successful HTTP response."
 
       - name: Verify live admin panel
         run: |
           set -eu
-          curl --fail --silent --show-error \
-            --retry 3 --retry-delay 2 \
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 5 \
+            --retry-delay 3 \
+            --retry-connrefused \
+            --max-time 30 \
             --output /dev/null \
             "https://maharashtrachiolakh.com/admin/?deploy=${GITHUB_SHA}"
+
+          echo "Admin panel returned a successful HTTP response."
 
       - name: Verify live API health
         run: |
           set -eu
-          curl --fail --silent --show-error \
-            --retry 3 --retry-delay 2 \
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 5 \
+            --retry-delay 3 \
+            --retry-connrefused \
+            --max-time 30 \
             https://maharashtrachiolakh.com/api/health
+
           echo
+          echo "API health check passed."
