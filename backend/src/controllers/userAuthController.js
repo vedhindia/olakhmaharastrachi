@@ -18,6 +18,12 @@ const createEmailTransport = () => {
         });
     }
 
+    // In production an incomplete SMTP configuration must fail loudly instead of
+    // silently falling back to a transport that never delivers the email.
+    if (process.env.NODE_ENV === 'production') {
+        return null;
+    }
+
     return nodemailer.createTransport({
         streamTransport: true,
         newline: 'unix',
@@ -28,6 +34,9 @@ const createEmailTransport = () => {
 const sendOtpToUser = async (identifier, type, otp) => {
     if (type === 'email') {
         const transport = createEmailTransport();
+        if (!transport) {
+            throw new Error('Email delivery is not configured. Please contact support.');
+        }
         const from = process.env.FROM_EMAIL || process.env.ADMIN_EMAIL || 'no-reply@ecommerce-ashoka.local';
         const subject = 'Your Maharashtrachi-Olakh verification code';
         const text = `Your Maharashtrachi-Olakh verification code is ${otp}. It will expire in 10 minutes.`;
@@ -45,7 +54,6 @@ const sendOtpToUser = async (identifier, type, otp) => {
         return true;
     }
 
-    console.log(`[MOCK OTP] Sending ${otp} to phone: ${identifier}`);
     return true;
 };
 
@@ -92,12 +100,9 @@ exports.sendOtp = async (req, res) => {
 
         await sendOtpToUser(identifier, type, otp);
 
-        res.json({ 
-            success: true, 
-            message: `OTP sent successfully to ${identifier}`,
-            // For development/testing purposes, returning OTP in response
-            // Remove this in production!
-            otp: otp 
+        res.json({
+            success: true,
+            message: `OTP sent successfully to ${type === 'email' ? 'your email' : 'your phone'}`
         });
 
     } catch (error) {
