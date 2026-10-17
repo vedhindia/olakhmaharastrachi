@@ -17,7 +17,7 @@ const { Op } = require('sequelize');
 const { Coupon, Review, Product, User, Wholesaler, CommunicationLog, Category, ProductImage, Order, CartItem, OrderItem, ProductVariant } = require('./src/models');
 const fixProductImages = require('./scripts/fix_product_images');
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5003;
 
 let dbInitialized = false;
 
