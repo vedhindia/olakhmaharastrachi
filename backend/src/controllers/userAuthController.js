@@ -38,10 +38,10 @@ const sendOtpToUser = async (identifier, type, otp) => {
             throw new Error('Email delivery is not configured. Please contact support.');
         }
         const from = process.env.FROM_EMAIL || process.env.ADMIN_EMAIL || 'no-reply@ecommerce-ashoka.local';
-        const subject = 'Your Maharashtrachi-Olakh verification code';
-        const text = `Your Maharashtrachi-Olakh verification code is ${otp}. It will expire in 10 minutes.`;
+        const subject = 'Your Maharashtrachi-Olakh code';
+        const text = `Your Maharashtrachi-Olakh code is ${otp}. It will expire in 10 minutes.`;
         const html = `
-            <p>Your Maharashtrachi-Olakh verification code is <strong>${otp}</strong>.</p>
+            <p>Your Maharashtrachi-Olakh code is <strong>${otp}</strong>.</p>
             <p>This code will expire in 10 minutes.</p>
         `;
         await transport.sendMail({
