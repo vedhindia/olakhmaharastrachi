@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build:
-    name: Install, check and build
+    name: Install, validate and build
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -30,11 +30,22 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Install dependencies
+      - name: Install repository dependencies
         run: npm ci
 
-      - name: Check backend syntax
-        run: node --check backend/index.js
+      - name: Validate backend source
+        run: |
+          set -eu
+
+          test -s backend/index.js
+          test -s backend/package.json
+          test -s backend/package-lock.json
+
+          node --check backend/index.js
+          node -e "JSON.parse(require('fs').readFileSync('backend/package.json', 'utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('backend/package-lock.json', 'utf8'))"
+
+          echo "Backend entry point and dependency files are valid."
 
       - name: Build public website
         run: npm run build:ashoka
@@ -49,15 +60,15 @@ jobs:
           test -s Frontend/dist/index.html
           test -s admin-panel/dist/index.html
 
-          echo "Public website build:"
+          echo "Public website:"
           du -sh Frontend/dist
           find Frontend/dist -type f | wc -l
 
-          echo "Admin panel build:"
+          echo "Admin panel:"
           du -sh admin-panel/dist
           find admin-panel/dist -type f | wc -l
 
-          echo "Commit being built: $GITHUB_SHA"
+          echo "Commit: $GITHUB_SHA"
 
       - name: Upload public website artifact
         uses: actions/upload-artifact@v4
@@ -75,8 +86,20 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Upload backend source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-release
+          path: |
+            backend/**
+            !backend/node_modules/**
+            !backend/.env
+            !backend/.git/**
+          if-no-files-found: error
+          retention-days: 7
+
   deploy:
-    name: Deploy frontend to VPS
+    name: Deploy website, admin and backend to VPS
     needs: build
     if: >-
       github.ref == 'refs/heads/main' &&
@@ -87,30 +110,37 @@ jobs:
     environment: production
 
     steps:
-      - name: Download public website artifact
+      - name: Download public website
         uses: actions/download-artifact@v4
         with:
           name: public-website-dist
           path: release/public
 
-      - name: Download admin panel artifact
+      - name: Download admin panel
         uses: actions/download-artifact@v4
         with:
           name: admin-panel-dist
           path: release/admin
 
-      - name: Verify downloaded artifacts
+      - name: Download backend source
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-release
+          path: release/backend
+
+      - name: Validate downloaded releases
         run: |
           set -eu
 
           test -s release/public/index.html
           test -s release/admin/index.html
+          test -s release/backend/index.js
+          test -s release/backend/package.json
+          test -s release/backend/package-lock.json
 
-          echo "Downloaded public website:"
-          du -sh release/public
+          node --check release/backend/index.js
 
-          echo "Downloaded admin panel:"
-          du -sh release/admin
+          echo "All three releases passed validation."
 
       - name: Configure SSH
         env:
@@ -131,7 +161,7 @@ jobs:
           printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
 
-      - name: Test VPS SSH connection
+      - name: Test VPS SSH and prepare staging
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -150,60 +180,87 @@ jobs:
             -o ServerAliveCountMax=6 \
             "$VPS_USER@$VPS_HOST" \
             'set -eu
-             printf "SSH connection successful\n"
-             printf "Remote user: "
+             echo "SSH connection successful."
              id -un
-             printf "Remote rsync: "
              command -v rsync
-             mkdir -p "$HOME/staging/public" "$HOME/staging/admin"'
+             mkdir -p "$HOME/staging/public"
+             mkdir -p "$HOME/staging/admin"
+             mkdir -p "$HOME/staging/backend"'
 
-      - name: Transfer public website using rsync
+      - name: Transfer public website
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           set -eu
 
-          echo "Starting public website transfer..."
-
           rsync \
-            -az \
-            --delete \
-            --partial \
-            --human-readable \
-            --stats \
-            --info=progress2 \
+            -az --delete --partial \
+            --human-readable --stats \
             --timeout=180 \
-            -e "ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6" \
+            -e "ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20" \
             release/public/ \
             "$VPS_USER@$VPS_HOST:staging/public/"
 
-          echo "Public website transfer completed."
-
-      - name: Transfer admin panel using rsync
+      - name: Transfer admin panel
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           set -eu
 
-          echo "Starting admin panel transfer..."
-
           rsync \
-            -az \
-            --delete \
-            --partial \
-            --human-readable \
-            --stats \
-            --info=progress2 \
+            -az --delete --partial \
+            --human-readable --stats \
             --timeout=180 \
-            -e "ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6" \
+            -e "ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20" \
             release/admin/ \
             "$VPS_USER@$VPS_HOST:staging/admin/"
 
-          echo "Admin panel transfer completed."
+      - name: Transfer backend source
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -eu
 
-      - name: Validate both remote staging builds
+          rsync \
+            -az --delete --partial \
+            --human-readable --stats \
+            --timeout=180 \
+            -e "ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20" \
+            release/backend/ \
+            "$VPS_USER@$VPS_HOST:staging/backend/"
+
+      - name: Validate remote staging
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -eu
+
+          ssh \
+            -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=20 \
+            "$VPS_USER@$VPS_HOST" \
+            'set -eu
+             for dir in public admin backend; do
+               test -d "$HOME/staging/$dir"
+             done
+
+             test -s "$HOME/staging/public/index.html"
+             test -s "$HOME/staging/admin/index.html"
+             test -s "$HOME/staging/backend/index.js"
+             test -s "$HOME/staging/backend/package.json"
+             test -s "$HOME/staging/backend/package-lock.json"
+
+             node --check "$HOME/staging/backend/index.js"
+
+             echo "Remote staging validation passed."'
+
+      - name: Publish website, admin and backend
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -219,86 +276,42 @@ jobs:
             -o ServerAliveCountMax=6 \
             "$VPS_USER@$VPS_HOST" \
             'set -eu
-             PUBLIC_DIR="$HOME/staging/public"
-             ADMIN_DIR="$HOME/staging/admin"
-
-             test -s "$PUBLIC_DIR/index.html"
-             test -s "$ADMIN_DIR/index.html"
-
-             echo "Public staging validation passed."
-             du -sh "$PUBLIC_DIR"
-             find "$PUBLIC_DIR" -type f | wc -l
-
-             echo "Admin staging validation passed."
-             du -sh "$ADMIN_DIR"
-             find "$ADMIN_DIR" -type f | wc -l
-
-             echo "Both staging builds are ready to publish."'
-
-      - name: Publish frontend artifacts
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-        run: |
-          set -eu
-
-          ssh \
-            -i "$HOME/.ssh/deploy_key" \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -o ConnectTimeout=20 \
-            -o ServerAliveInterval=30 \
-            -o ServerAliveCountMax=6 \
-            "$VPS_USER@$VPS_HOST" \
-            'sudo -n /usr/local/sbin/deploy-maharashtrachiolakh-frontend'
+             sudo -n /usr/local/sbin/deploy-maharashtrachiolakh-frontend
+             sudo -n /usr/local/sbin/deploy-maharashtrachiolakh-backend "$HOME/staging/backend"'
 
       - name: Verify live public website
         run: |
           set -eu
 
           curl \
-            --fail \
-            --silent \
-            --show-error \
-            --retry 5 \
-            --retry-delay 3 \
-            --retry-connrefused \
-            --max-time 30 \
-            --output /dev/null \
+            --fail --silent --show-error \
+            --retry 5 --retry-delay 3 --retry-connrefused \
+            --max-time 30 --output /dev/null \
             "https://maharashtrachiolakh.com/?deploy=${GITHUB_SHA}"
 
-          echo "Public website returned a successful HTTP response."
+          echo "Public website check passed."
 
       - name: Verify live admin panel
         run: |
           set -eu
 
           curl \
-            --fail \
-            --silent \
-            --show-error \
-            --retry 5 \
-            --retry-delay 3 \
-            --retry-connrefused \
-            --max-time 30 \
-            --output /dev/null \
+            --fail --silent --show-error \
+            --retry 5 --retry-delay 3 --retry-connrefused \
+            --max-time 30 --output /dev/null \
             "https://maharashtrachiolakh.com/admin/?deploy=${GITHUB_SHA}"
 
-          echo "Admin panel returned a successful HTTP response."
+          echo "Admin panel check passed."
 
-      - name: Verify live API health
+      - name: Verify live backend API
         run: |
           set -eu
 
           curl \
-            --fail \
-            --silent \
-            --show-error \
-            --retry 5 \
-            --retry-delay 3 \
-            --retry-connrefused \
+            --fail --silent --show-error \
+            --retry 5 --retry-delay 3 --retry-connrefused \
             --max-time 30 \
-            https://maharashtrachiolakh.com/api/health
+            "https://maharashtrachiolakh.com/api/health"
 
           echo
-          echo "API health check passed."
+          echo "Backend API health check passed."
