@@ -1,4 +1,4 @@
-const { Order, OrderItem, Cart, CartItem, Product, ProductVariant, ProductImage, User, Wholesaler, Coupon, Shipment } = require('../models');
+const { Order, OrderItem, Cart, CartItem, Product, ProductImage, User, Wholesaler, Coupon, Shipment } = require('../models');
 const sequelize = require('../config/database');
 const { Op } = require('sequelize');
 const nodemailer = require('nodemailer');
@@ -117,8 +117,9 @@ const buildPublicOrderId = (order) => {
 const getInvoiceLogoDataUri = () => {
   try {
     const candidates = [
-      path.join(__dirname, '../../../Ashoka/src/assets/images/logo.png'),
+      path.join(__dirname, '../../../admin-panel/src/assets/logoo.png'),
       path.join(__dirname, '../../../admin-panel/src/assets/logo.png'),
+      path.join(__dirname, '../../../Ashoka/src/assets/images/logo.png'),
     ];
     const logoPath = candidates.find((p) => fs.existsSync(p));
     if (!logoPath) return null;
@@ -133,8 +134,9 @@ const getInvoiceLogoDataUri = () => {
 const getInvoiceLogoBuffer = () => {
   try {
     const candidates = [
-      path.join(__dirname, '../../../Ashoka/src/assets/images/logo.png'),
+      path.join(__dirname, '../../../admin-panel/src/assets/logoo.png'),
       path.join(__dirname, '../../../admin-panel/src/assets/logo.png'),
+      path.join(__dirname, '../../../Ashoka/src/assets/images/logo.png'),
     ];
     const logoPath = candidates.find((p) => fs.existsSync(p));
     if (!logoPath) return null;
@@ -144,13 +146,44 @@ const getInvoiceLogoBuffer = () => {
   }
 };
 
+const INVOICE_BRAND_NAME = 'Olakh Maharashtrachi';
+
+const formatInvoiceMoney = (value) => `Rs. ${Number(value || 0).toFixed(2)}`;
+
+const escapeInvoiceHtml = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const getInvoiceRecipientDetails = (order) => {
+  const isCustomer = Boolean(order.customer);
+  return {
+    titleName: isCustomer
+      ? order.customer?.name || 'Customer'
+      : order.wholesaler?.business_name || order.wholesaler?.name || 'Wholesaler',
+    identity: isCustomer ? 'Customer' : 'Wholesaler',
+    email: order.customer?.email || order.wholesaler?.email || '-',
+    phone: order.customer?.phone || order.wholesaler?.phone || '-',
+  };
+};
+
+const formatInvoiceAddressHtml = (value) => {
+  const safe = escapeInvoiceHtml(value || '-');
+  return safe.replace(/\r?\n/g, '<br />');
+};
+
+const getInvoiceItemName = (item) => {
+  const baseName = String(item?.product_name || '-');
+  const variantName = String(item?.variant_name || '').trim();
+  if (!variantName) return baseName;
+  return `${baseName}\nVariant: ${variantName}`;
+};
+
 const buildInvoiceHtml = ({ order, includePrintScript }) => {
-  const titleName = order.customer
-    ? order.customer.name
-    : order.wholesaler
-      ? order.wholesaler.business_name
-      : 'Customer';
-  const identity = order.customer ? 'Customer' : 'Wholesaler';
+  const { titleName, identity, email, phone } = getInvoiceRecipientDetails(order);
   const shippingFee = Number(order.shipping_fee || 0);
   const subtotal = Number(order.total_amount || 0) + Number(order.discount_amount || 0) - shippingFee;
   const discount = Number(order.discount_amount || 0);
@@ -179,32 +212,34 @@ const buildInvoiceHtml = ({ order, includePrintScript }) => {
         }
       }
       const imageMarkup = imageUrl
-        ? `<img src="${imageUrl}" alt="${it.product_name}" style="width:40px;height:40px;object-fit:cover;margin-right:8px;border-radius:4px;border:1px solid #eee;" />`
+        ? `<img src="${imageUrl}" alt="${escapeInvoiceHtml(it.product_name)}" style="width:52px;height:52px;object-fit:cover;border-radius:12px;border:1px solid #e5e7eb;background:#fff7ed;" />`
         : '';
-      const variantLabel = it.variant_name
-        ? `<div style="font-size:12px;color:#6b7280;margin-top:2px;">${it.variant_name}</div>`
+      const productName = escapeInvoiceHtml(it.product_name || '-');
+      const variantName = String(it.variant_name || '').trim();
+      const variantMarkup = variantName
+        ? `<div class="item-subtitle">Variant: ${escapeInvoiceHtml(variantName)}</div>`
         : '';
       return `
-      <tr>
-        <td style="padding:8px;border-bottom:1px solid #eee;">
-          <div style="display:flex;align-items:center;gap:8px;">
+      <tr class="item-row">
+        <td class="cell product-cell">
+          <div class="product-wrap">
             ${imageMarkup}
             <div>
-              <div>${it.product_name}</div>
-              ${variantLabel}
+              <div class="item-title">${productName}</div>
+              ${variantMarkup}
             </div>
           </div>
         </td>
-        <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">${it.quantity}</td>
-        <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">₹${Number(it.price).toFixed(2)}</td>
-        <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">₹${(Number(it.price) * it.quantity).toFixed(2)}</td>
+        <td class="cell text-center">${Number(it.quantity || 0)}</td>
+        <td class="cell text-right">${formatInvoiceMoney(it.price)}</td>
+        <td class="cell text-right">${formatInvoiceMoney(Number(it.price || 0) * Number(it.quantity || 0))}</td>
       </tr>
     `;
     })
     .join('');
 
   const logoMarkup = logoDataUri
-    ? `<img src="${logoDataUri}" alt="Logo" style="height:44px;object-fit:contain;display:block;margin-bottom:6px;" />`
+    ? `<img src="${logoDataUri}" alt="Logo" style="height:58px;max-width:150px;object-fit:contain;display:block;" />`
     : '';
 
   return `
@@ -212,94 +247,270 @@ const buildInvoiceHtml = ({ order, includePrintScript }) => {
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Invoice #${order.id}</title>
+    <title>Invoice #${publicId}</title>
     <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; color: #222; }
-      .container { max-width: 900px; margin: 24px auto; padding: 24px; border: 1px solid #ddd; border-radius: 8px; }
-      .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; gap: 16px; }
-      .brand { font-weight: 700; font-size: 20px; }
-      .meta { text-align: right; font-size: 14px; color: #555; }
-      .section { margin-top: 16px; }
-      .section h3 { margin: 0 0 8px 0; font-size: 16px; color: #333; }
-      table { width: 100%; border-collapse: collapse; }
-      .totals td { padding: 6px; }
-      .totals .label { text-align: right; color: #555; }
-      .totals .value { text-align: right; font-weight: 600; }
-      .footer { margin-top: 24px; font-size: 12px; color: #777; text-align: center; }
-      .badge { display: inline-block; padding: 4px 8px; border-radius: 12px; background: #e8f5e9; color: #2e7d32; font-size: 12px; text-transform: capitalize; }
+      @page { margin: 20mm 14mm 18mm 14mm; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: #f6f7fb;
+        color: #111827;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+      }
+      .invoice-shell {
+        max-width: 940px;
+        margin: 24px auto;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 24px;
+        overflow: hidden;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      }
+      .top-accent {
+        height: 8px;
+        background: linear-gradient(90deg, #f97316 0%, #fb923c 45%, #fdba74 100%);
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 20px;
+        padding: 24px 28px 18px 28px;
+        border-bottom: 1px solid #eef2f7;
+      }
+      .brand-block { display: flex; align-items: flex-start; gap: 16px; flex: 1; min-width: 0; }
+      .brand-copy { min-width: 0; flex: 1; }
+      .eyebrow {
+        color: #ea580c;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .brand {
+        margin-top: 6px;
+        font-size: 24px;
+        font-weight: 800;
+        color: #111827;
+        line-height: 1.15;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+      }
+      .meta-panel {
+        min-width: 260px;
+        flex: 0 0 260px;
+        padding: 16px 18px;
+        border: 1px solid #e5e7eb;
+        border-radius: 18px;
+        background: #fffaf5;
+      }
+      .meta-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 4px 0;
+        font-size: 13px;
+      }
+      .meta-label { color: #6b7280; }
+      .meta-value { color: #111827; font-weight: 700; text-align: right; }
+      .badge {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: #fff7ed;
+        border: 1px solid #fdba74;
+        color: #c2410c;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: capitalize;
+      }
+      .content { padding: 22px 28px 28px 28px; }
+      .details-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+      .card {
+        border: 1px solid #e5e7eb;
+        border-radius: 20px;
+        background: #ffffff;
+        padding: 18px;
+      }
+      .card-title {
+        margin: 0 0 14px 0;
+        color: #111827;
+        font-size: 15px;
+        font-weight: 800;
+      }
+      .line { margin: 6px 0; font-size: 13px; color: #374151; }
+      .line strong { color: #111827; }
+      .address-block {
+        white-space: normal;
+        font-size: 13px;
+        line-height: 1.7;
+        color: #374151;
+      }
+      .table-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 20px;
+        overflow: hidden;
+        background: #ffffff;
+      }
+      .table-title {
+        padding: 16px 18px 12px 18px;
+        font-size: 15px;
+        font-weight: 800;
+        color: #111827;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      thead { display: table-header-group; }
+      tfoot { display: table-footer-group; }
+      tr, td, th {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      thead th {
+        padding: 12px 14px;
+        background: #fff7ed;
+        border-top: 1px solid #e5e7eb;
+        border-bottom: 1px solid #e5e7eb;
+        color: #6b7280;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .item-row { border-bottom: 1px solid #eef2f7; }
+      .cell { padding: 14px; font-size: 13px; vertical-align: top; color: #111827; }
+      .product-cell { width: 52%; }
+      .product-wrap { display: flex; align-items: flex-start; gap: 12px; }
+      .item-title { font-weight: 700; line-height: 1.45; }
+      .item-subtitle { margin-top: 4px; color: #6b7280; font-size: 12px; }
+      .text-center { text-align: center; }
+      .text-right { text-align: right; white-space: nowrap; }
+      .summary-wrap {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 18px;
+      }
+      .summary-card {
+        width: 320px;
+        border: 1px solid #e5e7eb;
+        border-radius: 20px;
+        background: #fffaf5;
+        padding: 16px 18px;
+      }
+      .summary-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 6px 0;
+        font-size: 13px;
+      }
+      .summary-row .label { color: #6b7280; }
+      .summary-row .value { color: #111827; font-weight: 700; text-align: right; white-space: nowrap; }
+      .summary-row.total {
+        margin-top: 6px;
+        padding-top: 12px;
+        border-top: 1px solid #fdba74;
+        font-size: 15px;
+      }
+      .summary-row.total .label,
+      .summary-row.total .value { color: #111827; font-weight: 800; }
+      .footer {
+        padding: 18px 28px 26px 28px;
+        text-align: center;
+        font-size: 12px;
+        color: #6b7280;
+      }
+      @media print {
+        body { background: #ffffff; }
+        .invoice-shell {
+          margin: 0;
+          border-radius: 0;
+          box-shadow: none;
+          border: none;
+        }
+      }
     </style>
   </head>
   <body>
-    <div class="container">
+    <div class="invoice-shell">
+      <div class="top-accent"></div>
       <div class="header">
-        <div>
-          ${logoMarkup}
-          <div class="brand">Ashoka</div>
-          <div style="color:#777;font-size:12px;">Invoice</div>
+        <div class="brand-block">
+          <div>${logoMarkup}</div>
+          <div class="brand-copy">
+            <div class="eyebrow">Invoice</div>
+            <div class="brand">${INVOICE_BRAND_NAME}</div>
+          </div>
         </div>
-        <div class="meta">
-          <div>Invoice #: ${publicId}</div>
-          <div>Date: ${dateStr}</div>
-          <div>Status: <span class="badge">${order.status || 'pending'}</span></div>
-        </div>
-      </div>
-
-      <div class="section">
-        <h3>Bill To</h3>
-        <div style="border:1px solid #eee;padding:12px;border-radius:6px;">
-          <div><strong>${identity}:</strong> ${titleName}</div>
-          <div><strong>Email:</strong> ${order.customer?.email || order.wholesaler?.email || '-'}</div>
-          <div><strong>Phone:</strong> ${order.customer?.phone || order.wholesaler?.phone || '-'}</div>
+        <div class="meta-panel">
+          <div class="meta-row"><span class="meta-label">Invoice #</span><span class="meta-value">${escapeInvoiceHtml(publicId)}</span></div>
+          <div class="meta-row"><span class="meta-label">Date</span><span class="meta-value">${escapeInvoiceHtml(dateStr)}</span></div>
+          <div class="meta-row"><span class="meta-label">Status</span><span class="meta-value"><span class="badge">${escapeInvoiceHtml(order.status || 'pending')}</span></span></div>
         </div>
       </div>
 
-      <div class="section">
-        <h3>Shipping Address</h3>
-        <div style="border:1px solid #eee;padding:12px;border-radius:6px;">
-          ${order.shipping_address || '-'}
+      <div class="content">
+        <div class="details-grid">
+          <div class="card">
+            <div class="card-title">Bill To</div>
+            <div class="line"><strong>${escapeInvoiceHtml(identity)}:</strong> ${escapeInvoiceHtml(titleName)}</div>
+            <div class="line"><strong>Email:</strong> ${escapeInvoiceHtml(email)}</div>
+            <div class="line"><strong>Phone:</strong> ${escapeInvoiceHtml(phone)}</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Shipping Address</div>
+            <div class="address-block">${formatInvoiceAddressHtml(order.shipping_address)}</div>
+          </div>
         </div>
-      </div>
 
-      <div class="section">
-        <h3>Items</h3>
-        <table>
-          <thead>
-            <tr>
-              <th style="text-align:left;padding:8px;border-bottom:1px solid #ccc;">Product</th>
-              <th style="text-align:center;padding:8px;border-bottom:1px solid #ccc;">Qty</th>
-              <th style="text-align:right;padding:8px;border-bottom:1px solid #ccc;">Price</th>
-              <th style="text-align:right;padding:8px;border-bottom:1px solid #ccc;">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows}
-          </tbody>
-        </table>
-      </div>
+        <div class="table-card">
+          <div class="table-title">Items</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align:left;">Product</th>
+                <th style="text-align:center;">Qty</th>
+                <th style="text-align:right;">Price</th>
+                <th style="text-align:right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </div>
 
-      <div class="section">
-        <table class="totals">
-          <tr>
-            <td class="label" style="width:80%;">Subtotal</td>
-            <td class="value" style="width:20%;">₹${subtotal.toFixed(2)}</td>
-          </tr>
-          <tr>
-            <td class="label">Discount ${order.coupon_code ? '(' + order.coupon_code + ')' : ''}</td>
-            <td class="value">-₹${discount.toFixed(2)}</td>
-          </tr>
-          <tr>
-            <td class="label">Shipping</td>
-            <td class="value">₹${shippingFee.toFixed(2)}</td>
-          </tr>
-          <tr>
-            <td class="label"><strong>Grand Total</strong></td>
-            <td class="value"><strong>₹${total.toFixed(2)}</strong></td>
-          </tr>
-        </table>
+        <div class="summary-wrap">
+          <div class="summary-card">
+            <div class="summary-row">
+              <span class="label">Subtotal</span>
+              <span class="value">${formatInvoiceMoney(subtotal)}</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Discount ${order.coupon_code ? `(${escapeInvoiceHtml(order.coupon_code)})` : ''}</span>
+              <span class="value">- ${formatInvoiceMoney(discount)}</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Shipping</span>
+              <span class="value">${formatInvoiceMoney(shippingFee)}</span>
+            </div>
+            <div class="summary-row total">
+              <span class="label">Grand Total</span>
+              <span class="value">${formatInvoiceMoney(total)}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="footer">
-        This is a system-generated invoice. If you have questions, contact support.
+        This is a system-generated invoice from ${INVOICE_BRAND_NAME}. If you have questions, contact support.
       </div>
     </div>
     ${
@@ -325,8 +536,7 @@ const buildInvoicePdfBuffer = ({ order }) =>
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      const formatMoney = (value) => `Rs. ${Number(value || 0).toFixed(2)}`;
-
+      const { titleName, identity, email, phone } = getInvoiceRecipientDetails(order);
       const shippingFee = Number(order.shipping_fee || 0);
       const subtotal = Number(order.total_amount || 0) + Number(order.discount_amount || 0) - shippingFee;
       const discount = Number(order.discount_amount || 0);
@@ -338,151 +548,179 @@ const buildInvoicePdfBuffer = ({ order }) =>
       const leftX = doc.page.margins.left;
       const rightX = doc.page.width - doc.page.margins.right;
       const topY = doc.page.margins.top;
+      const footerY = doc.page.height - doc.page.margins.bottom - 10;
+      const contentBottom = doc.page.height - doc.page.margins.bottom - 48;
+      const productWidth = pageWidth * 0.52;
+      const qtyWidth = pageWidth * 0.12;
+      const priceWidth = pageWidth * 0.18;
+      const totalWidth = pageWidth - productWidth - qtyWidth - priceWidth;
+      const tableX = leftX;
+      const qtyX = tableX + productWidth;
+      const priceX = qtyX + qtyWidth;
+      const totalX = priceX + priceWidth;
 
       const logoBuf = getInvoiceLogoBuffer();
-      if (logoBuf) {
-        try {
-          doc.image(logoBuf, leftX, topY, { height: 38 });
-        } catch {}
-      }
+      const drawFooter = () => {
+        doc.fontSize(8).fillColor('#6b7280').text(
+          `This is a system-generated invoice from ${INVOICE_BRAND_NAME}.`,
+          leftX,
+          footerY,
+          { width: pageWidth, align: 'center' },
+        );
+      };
 
-      const brandX = logoBuf ? leftX + 90 : leftX;
-      doc.fontSize(18).fillColor('#111827').text('Ashoka', brandX, topY + 2);
-      doc.fontSize(10).fillColor('#6b7280').text('Invoice', brandX, topY + 26);
+      const drawHeader = ({ continued = false }) => {
+        doc.save();
+        doc.roundedRect(leftX, topY, pageWidth, 92, 16).fillAndStroke('#fffaf5', '#fdba74');
+        if (logoBuf) {
+          try {
+            doc.image(logoBuf, leftX + 18, topY + 16, { height: 56, width: 140, fit: [140, 56] });
+          } catch {}
+        }
+        const brandX = logoBuf ? leftX + 160 : leftX + 20;
+        const metaBoxX = rightX - 220;
+        const brandWidth = Math.max(170, metaBoxX - brandX - 16);
+        doc.fillColor('#ea580c').fontSize(10).font('Helvetica-Bold')
+          .text(continued ? 'INVOICE CONTINUED' : 'INVOICE', brandX, topY + 16);
+        doc.fillColor('#111827').fontSize(18).font('Helvetica-Bold')
+          .text(INVOICE_BRAND_NAME, brandX, topY + 30, { width: brandWidth, lineGap: 1 });
+        doc.roundedRect(metaBoxX, topY + 14, 200, 62, 12).fillAndStroke('#ffffff', '#e5e7eb');
+        doc.fillColor('#6b7280').fontSize(9).font('Helvetica')
+          .text('Invoice #', metaBoxX + 14, topY + 24)
+          .text('Date', metaBoxX + 14, topY + 41)
+          .text('Status', metaBoxX + 14, topY + 58);
+        doc.fillColor('#111827').fontSize(9).font('Helvetica-Bold')
+          .text(String(publicId), metaBoxX + 84, topY + 24, { width: 102, align: 'right' })
+          .text(dateStr, metaBoxX + 84, topY + 41, { width: 102, align: 'right' })
+          .text(String(order.status || 'pending'), metaBoxX + 84, topY + 58, { width: 102, align: 'right' });
+        doc.restore();
+        return topY + 100;
+      };
 
-      doc.fontSize(10).fillColor('#111827');
-      doc.text(`Invoice #: ${publicId}`, leftX, topY + 2, { width: pageWidth, align: 'right' });
-      doc.text(`Date: ${dateStr}`, leftX, topY + 16, { width: pageWidth, align: 'right' });
-      doc.text(`Status: ${(order.status || 'pending').toString()}`, leftX, topY + 30, {
-        width: pageWidth,
-        align: 'right',
-      });
+      const drawInfoCards = (startY) => {
+        const gap = 16;
+        const boxWidth = (pageWidth - gap) / 2;
+        const boxPadding = 14;
+        const billingLines = [
+          `${identity}: ${titleName}`,
+          `Email: ${email}`,
+          `Phone: ${phone}`,
+        ];
+        const shippingText = String(order.shipping_address || '-');
+        const billingTextHeight = billingLines.reduce((sum, line) => (
+          sum + doc.heightOfString(line, { width: boxWidth - boxPadding * 2 })
+        ), 0);
+        const shippingTextHeight = doc.heightOfString(shippingText, {
+          width: boxWidth - boxPadding * 2,
+        });
+        const boxHeight = Math.max(96, billingTextHeight + 48, shippingTextHeight + 48);
 
-      doc.y = topY + 60;
+        doc.roundedRect(leftX, startY, boxWidth, boxHeight, 14).fillAndStroke('#ffffff', '#e5e7eb');
+        doc.roundedRect(leftX + boxWidth + gap, startY, boxWidth, boxHeight, 14).fillAndStroke('#ffffff', '#e5e7eb');
 
-      doc.moveDown(1.2);
-      doc.strokeColor('#e5e7eb').lineWidth(1).moveTo(leftX, doc.y).lineTo(rightX, doc.y).stroke();
-      doc.moveDown(1);
+        doc.fillColor('#111827').fontSize(12).font('Helvetica-Bold').text('Bill To', leftX + boxPadding, startY + 14);
+        doc.fillColor('#111827').fontSize(10).font('Helvetica');
+        let billY = startY + 36;
+        billingLines.forEach((line) => {
+          doc.text(line, leftX + boxPadding, billY, { width: boxWidth - boxPadding * 2 });
+          billY += doc.heightOfString(line, { width: boxWidth - boxPadding * 2 }) + 4;
+        });
 
-      const customerName = order.customer
-        ? order.customer.name
-        : order.wholesaler
-          ? order.wholesaler.business_name
-          : 'Customer';
-      const customerEmail = order.customer?.email || order.wholesaler?.email || '';
-      const customerPhone = order.customer?.phone || order.wholesaler?.phone || '';
+        doc.fillColor('#111827').fontSize(12).font('Helvetica-Bold')
+          .text('Shipping Address', leftX + boxWidth + gap + boxPadding, startY + 14);
+        doc.fillColor('#111827').fontSize(10).font('Helvetica')
+          .text(shippingText, leftX + boxWidth + gap + boxPadding, startY + 36, {
+            width: boxWidth - boxPadding * 2,
+            lineGap: 2,
+          });
 
-      doc.fontSize(11).fillColor('#111827').text('Bill To', leftX);
-      doc.moveDown(0.4);
-      doc.fontSize(10).fillColor('#111827');
-      doc.text(`Customer: ${customerName}`);
-      if (customerEmail) doc.text(`Email: ${customerEmail}`);
-      if (customerPhone) doc.text(`Phone: ${customerPhone}`);
+        return startY + boxHeight + 18;
+      };
 
-      doc.moveDown(0.8);
-      doc.fontSize(11).fillColor('#111827').text('Shipping Address', leftX);
-      doc.moveDown(0.4);
-      doc.fontSize(10).fillColor('#111827').text(String(order.shipping_address || '-'), {
-        width: pageWidth,
-      });
+      const drawItemsHeader = (y) => {
+        doc.roundedRect(tableX, y, pageWidth, 26, 8).fillAndStroke('#fff7ed', '#fdba74');
+        doc.fillColor('#6b7280').fontSize(9).font('Helvetica-Bold');
+        doc.text('PRODUCT', tableX + 10, y + 8, { width: productWidth - 20 });
+        doc.text('QTY', qtyX + 4, y + 8, { width: qtyWidth - 8, align: 'center' });
+        doc.text('PRICE', priceX + 4, y + 8, { width: priceWidth - 8, align: 'right' });
+        doc.text('TOTAL', totalX + 4, y + 8, { width: totalWidth - 8, align: 'right' });
+        return y + 34;
+      };
 
-      doc.moveDown(1);
-      doc.fontSize(11).fillColor('#111827').text('Items', leftX);
-      doc.moveDown(0.5);
-
-      const tableTop = doc.y;
-      const colProduct = leftX;
-      const colQty = leftX + pageWidth * 0.55;
-      const colPrice = leftX + pageWidth * 0.70;
-      const colTotal = leftX + pageWidth * 0.85;
-
-      doc.fontSize(9).fillColor('#6b7280');
-      doc.text('Product', colProduct, tableTop, { width: pageWidth * 0.55 });
-      doc.text('Qty', colQty, tableTop, { width: pageWidth * 0.15, align: 'center' });
-      doc.text('Price', colPrice, tableTop, { width: pageWidth * 0.15, align: 'right' });
-      doc.text('Total', colTotal, tableTop, { width: pageWidth * 0.15, align: 'right' });
-
-      doc.moveTo(leftX, tableTop + 14).lineTo(rightX, tableTop + 14).strokeColor('#e5e7eb').stroke();
-
-      let y = tableTop + 22;
-      doc.fontSize(10).fillColor('#111827');
+      let y = drawHeader({ continued: false });
+      y = drawInfoCards(y);
+      y = drawItemsHeader(y);
 
       const rows = Array.isArray(order.items) ? order.items : [];
       rows.forEach((it) => {
         const price = Number(it.price || 0);
         const qty = Number(it.quantity || 0);
         const lineTotal = price * qty;
-        const name = String(it.product_name || '-');
-        const hasVariant = it.variant_name && String(it.variant_name).trim() !== '';
+        const itemName = getInvoiceItemName(it);
+        const nameOnly = String(it.product_name || '-');
+        const variantName = String(it.variant_name || '').trim();
+        const nameHeight = doc.heightOfString(nameOnly, { width: productWidth - 20, lineGap: 2 });
+        const rowHeight = Math.max(
+          34,
+          doc.heightOfString(itemName, { width: productWidth - 20, lineGap: 2 }) + 14,
+        );
 
-        doc.fontSize(10).fillColor('#111827');
-        doc.text(name, colProduct, y, { width: pageWidth * 0.55 });
-        let nextY = y;
-        if (hasVariant) {
-          doc.fontSize(8).fillColor('#6b7280');
-          doc.text(String(it.variant_name), colProduct + 4, y + 11, { width: pageWidth * 0.55 - 4 });
-          nextY += 4;
+        if (y + rowHeight > contentBottom) {
+          drawFooter();
+          doc.addPage();
+          y = drawHeader({ continued: true });
+          y = drawItemsHeader(y);
         }
-        doc.fontSize(10).fillColor('#111827');
-        doc.text(String(qty || 0), colQty, y, { width: pageWidth * 0.15, align: 'center' });
-        doc.text(formatMoney(price), colPrice, y, { width: pageWidth * 0.15, align: 'right' });
-        doc.text(formatMoney(lineTotal), colTotal, y, {
-          width: pageWidth * 0.15,
-          align: 'right',
-        });
 
-        y = nextY + 18;
-        doc.moveTo(leftX, y - 4).lineTo(rightX, y - 4).strokeColor('#f3f4f6').stroke();
-      });
+        doc.roundedRect(tableX, y, pageWidth, rowHeight, 8).fillAndStroke('#ffffff', '#e5e7eb');
+        doc.moveTo(qtyX, y).lineTo(qtyX, y + rowHeight).strokeColor('#eef2f7').stroke();
+        doc.moveTo(priceX, y).lineTo(priceX, y + rowHeight).strokeColor('#eef2f7').stroke();
+        doc.moveTo(totalX, y).lineTo(totalX, y + rowHeight).strokeColor('#eef2f7').stroke();
 
-      doc.moveDown(2);
-      const totalsTop = Math.max(doc.y, y + 10);
-      const totalsLabelX = leftX + pageWidth * 0.60;
-      const totalsValueX = leftX + pageWidth * 0.85;
+        doc.fillColor('#111827').fontSize(10).font('Helvetica-Bold')
+          .text(nameOnly, tableX + 10, y + 9, { width: productWidth - 20, lineGap: 2 });
+        if (variantName) {
+          doc.fillColor('#6b7280').fontSize(8).font('Helvetica')
+            .text(`Variant: ${variantName}`, tableX + 10, y + 9 + nameHeight + 2, { width: productWidth - 20 });
+        }
+        doc.fillColor('#111827').fontSize(10).font('Helvetica')
+          .text(String(qty || 0), qtyX + 4, y + 10, { width: qtyWidth - 8, align: 'center' })
+          .text(formatInvoiceMoney(price), priceX + 6, y + 10, { width: priceWidth - 12, align: 'right' })
+          .text(formatInvoiceMoney(lineTotal), totalX + 6, y + 10, { width: totalWidth - 12, align: 'right' });
 
-      doc.fontSize(10).fillColor('#6b7280').text('Subtotal', totalsLabelX, totalsTop, {
-        width: pageWidth * 0.20,
-        align: 'right',
-      });
-      doc.fontSize(10).fillColor('#111827').text(formatMoney(subtotal), totalsValueX, totalsTop, {
-        width: pageWidth * 0.15,
-        align: 'right',
+        y += rowHeight + 10;
       });
 
-      doc.fontSize(10).fillColor('#6b7280').text('Discount', totalsLabelX, totalsTop + 16, {
-        width: pageWidth * 0.20,
-        align: 'right',
-      });
-      doc.fontSize(10).fillColor('#111827').text(`- ${formatMoney(discount)}`, totalsValueX, totalsTop + 16, {
-        width: pageWidth * 0.15,
-        align: 'right',
-      });
+      const totalsHeight = 108;
+      if (y + totalsHeight > contentBottom) {
+        drawFooter();
+        doc.addPage();
+        y = drawHeader({ continued: true });
+      }
 
-      doc.fontSize(10).fillColor('#6b7280').text('Shipping', totalsLabelX, totalsTop + 32, {
-        width: pageWidth * 0.20,
-        align: 'right',
-      });
-      doc.fontSize(10).fillColor('#111827').text(formatMoney(shippingFee), totalsValueX, totalsTop + 32, {
-        width: pageWidth * 0.15,
-        align: 'right',
-      });
+      const totalsWidth = 240;
+      const totalsX = rightX - totalsWidth;
+      doc.roundedRect(totalsX, y, totalsWidth, totalsHeight, 14).fillAndStroke('#fffaf5', '#fdba74');
+      const totalsLabelX = totalsX + 14;
+      const totalsValueWidth = 96;
+      const totalsValueX = totalsX + totalsWidth - totalsValueWidth - 14;
 
-      doc.fontSize(11).fillColor('#111827').text('Grand Total', totalsLabelX, totalsTop + 52, {
-        width: pageWidth * 0.20,
-        align: 'right',
-      });
-      doc.fontSize(11).fillColor('#111827').text(formatMoney(total), totalsValueX, totalsTop + 52, {
-        width: pageWidth * 0.15,
-        align: 'right',
-      });
+      doc.fillColor('#6b7280').fontSize(10).font('Helvetica')
+        .text('Subtotal', totalsLabelX, y + 16, { width: totalsWidth - totalsValueWidth - 28 })
+        .text(`Discount${order.coupon_code ? ` (${order.coupon_code})` : ''}`, totalsLabelX, y + 36, {
+          width: totalsWidth - totalsValueWidth - 28,
+        })
+        .text('Shipping', totalsLabelX, y + 56, { width: totalsWidth - totalsValueWidth - 28 });
+      doc.fillColor('#111827').fontSize(10).font('Helvetica-Bold')
+        .text(formatInvoiceMoney(subtotal), totalsValueX, y + 16, { width: totalsValueWidth, align: 'right' })
+        .text(`- ${formatInvoiceMoney(discount)}`, totalsValueX, y + 36, { width: totalsValueWidth, align: 'right' })
+        .text(formatInvoiceMoney(shippingFee), totalsValueX, y + 56, { width: totalsValueWidth, align: 'right' });
+      doc.moveTo(totalsX + 14, y + 80).lineTo(totalsX + totalsWidth - 14, y + 80).strokeColor('#fdba74').stroke();
+      doc.fillColor('#111827').fontSize(11).font('Helvetica-Bold')
+        .text('Grand Total', totalsLabelX, y + 88, { width: totalsWidth - totalsValueWidth - 28 })
+        .text(formatInvoiceMoney(total), totalsValueX, y + 88, { width: totalsValueWidth, align: 'right' });
 
-      doc.moveDown(5);
-      doc.fontSize(9).fillColor('#6b7280').text(
-        'This is a system-generated invoice. If you have questions, contact support.',
-        leftX,
-        doc.page.height - doc.page.margins.bottom - 30,
-        { width: pageWidth, align: 'center' },
-      );
+      drawFooter();
 
       doc.end();
     } catch (err) {
@@ -533,15 +771,9 @@ const sendOrderConfirmationEmail = async (orderId) => {
       .map((it) => {
         const price = Number(it.price || 0);
         const lineTotal = price * it.quantity;
-        const variantLabel = it.variant_name
-          ? `<div style="font-size:11px;color:#6b7280;margin-top:2px;">${it.variant_name}</div>`
-          : '';
         return `
           <tr>
-            <td style="padding:6px 8px;border-bottom:1px solid #eee;">
-              <div>${it.product_name}</div>
-              ${variantLabel}
-            </td>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;">${it.product_name}</td>
             <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #eee;">${it.quantity}</td>
             <td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;">₹${price.toFixed(
               2,
@@ -829,38 +1061,14 @@ exports.placeOrder = async (req, res) => {
     const orderItemsData = [];
 
     for (const item of cart.items) {
-      const hasVariant = item.variant_id && Number(item.variant_id) > 0;
-      let variantForItem = null;
-      if (hasVariant) {
-        variantForItem = await ProductVariant.findByPk(item.variant_id, { transaction: t, lock: t.LOCK.UPDATE });
-        if (!variantForItem) {
-          await t.rollback();
-          return res.status(400).json({
-            message: `Variant not found for product: ${item.product.name}. Please refresh cart.`
-          });
-        }
-        if (variantForItem.status === 'inactive') {
-          await t.rollback();
-          return res.status(400).json({
-            message: `Variant ${item.variant_name || ''} for product ${item.product.name} is no longer available.`
-          });
-        }
-        if (variantForItem.stock < item.quantity) {
-          await t.rollback();
-          return res.status(400).json({
-            message: `Insufficient stock for ${item.product.name} (${item.variant_name || 'variant'}). Available: ${variantForItem.stock}`
-          });
-        }
-        await variantForItem.decrement('stock', { by: item.quantity, transaction: t });
-      } else {
-        if (item.product.stock < item.quantity) {
-          await t.rollback();
-          return res.status(400).json({
-            message: `Insufficient stock for product: ${item.product.name}. Available: ${item.product.stock}`
-          });
-        }
-        await item.product.decrement('stock', { by: item.quantity, transaction: t });
+      if (item.product.stock < item.quantity) {
+        await t.rollback();
+        return res.status(400).json({
+          message: `Insufficient stock for product: ${item.product.name}. Available: ${item.product.stock}`
+        });
       }
+
+      await item.product.decrement('stock', { by: item.quantity, transaction: t });
 
       const itemTotal = parseFloat(item.price) * item.quantity;
       totalAmount += itemTotal;
@@ -869,9 +1077,7 @@ exports.placeOrder = async (req, res) => {
         product_id: item.product_id,
         product_name: item.product.name,
         quantity: item.quantity,
-        price: item.price,
-        variant_id: hasVariant ? item.variant_id : null,
-        variant_name: hasVariant ? (item.variant_name || variantForItem?.variant_value || null) : null
+        price: item.price
       });
     }
 
@@ -995,7 +1201,7 @@ exports.instantPurchase = async (req, res) => {
   try {
     const userId = req.user.id;
     const userType = req.userType;
-    const { product_id, variant_id, quantity, shipping_address, payment_method, notes, coupon_code, billing_phone, phone } = req.body;
+    const { product_id, quantity, shipping_address, payment_method, notes, coupon_code, billing_phone, phone } = req.body;
 
     if (!product_id || !quantity) {
       await t.rollback();
@@ -1007,7 +1213,7 @@ exports.instantPurchase = async (req, res) => {
       return res.status(400).json({ message: 'Shipping address is required' });
     }
 
-    const product = await Product.findByPk(product_id, { transaction: t, lock: t.LOCK.UPDATE });
+    const product = await Product.findByPk(product_id, { transaction: t });
     if (!product) {
       await t.rollback();
       return res.status(404).json({ message: 'Product not found' });
@@ -1019,51 +1225,18 @@ exports.instantPurchase = async (req, res) => {
       return res.status(400).json({ message: 'Quantity must be a positive integer' });
     }
 
-    const hasVariant = variant_id && Number(variant_id) > 0;
-    let selectedVariant = null;
-    let effectiveCustomerPrice = null;
-    let effectiveWholesalerPrice = null;
-    let effectiveStock = 0;
-    let variantNameSnapshot = null;
-
-    if (hasVariant) {
-      selectedVariant = await ProductVariant.findOne({
-        where: { id: variant_id, product_id: product.id },
-        transaction: t,
-        lock: t.LOCK.UPDATE
-      });
-      if (!selectedVariant) {
-        await t.rollback();
-        return res.status(400).json({ message: 'Selected variant is not valid for this product' });
-      }
-      if (selectedVariant.status === 'inactive') {
-        await t.rollback();
-        return res.status(400).json({ message: 'Selected variant is no longer available' });
-      }
-      effectiveCustomerPrice = selectedVariant.customer_price;
-      effectiveWholesalerPrice = selectedVariant.wholesaler_price;
-      effectiveStock = selectedVariant.stock;
-      variantNameSnapshot = selectedVariant.variant_value;
-    } else {
-      effectiveStock = product.stock;
-    }
-
-    if (effectiveStock < qty) {
+    if (product.stock < qty) {
       await t.rollback();
       return res
         .status(400)
-        .json({ message: `Insufficient stock${variantNameSnapshot ? ` for ${variantNameSnapshot}` : ''}. Available: ${effectiveStock}` });
+        .json({ message: `Insufficient stock. Available: ${product.stock}` });
     }
 
     let price = 0;
     if (userType === 'wholesaler') {
-      price = effectiveWholesalerPrice != null && Number(effectiveWholesalerPrice) > 0
-        ? effectiveWholesalerPrice
-        : product.wholesaler_price;
+      price = product.wholesaler_price;
     } else {
-      price = effectiveCustomerPrice != null && Number(effectiveCustomerPrice) > 0
-        ? effectiveCustomerPrice
-        : product.customer_price;
+      price = product.customer_price;
     }
 
     const numericPrice = parseFloat(price || 0);
@@ -1135,11 +1308,7 @@ exports.instantPurchase = async (req, res) => {
 
     const finalAmount = totalAmountRaw - discountAmount + shippingFee;
 
-    if (hasVariant && selectedVariant) {
-      await selectedVariant.decrement('stock', { by: qty, transaction: t });
-    } else {
-      await product.decrement('stock', { by: qty, transaction: t });
-    }
+    await product.decrement('stock', { by: qty, transaction: t });
 
     const orderData = {
       total_amount: finalAmount,
@@ -1169,9 +1338,7 @@ exports.instantPurchase = async (req, res) => {
         product_id: product.id,
         product_name: product.name,
         quantity: qty,
-        price: numericPrice,
-        variant_id: hasVariant ? selectedVariant.id : null,
-        variant_name: hasVariant ? variantNameSnapshot : null
+        price: numericPrice
       },
       { transaction: t }
     );
@@ -1556,12 +1723,7 @@ exports.cancelMyOrder = async (req, res) => {
     }
 
     for (const item of order.items || []) {
-      if (item.variant_id && Number(item.variant_id) > 0) {
-        const variant = await ProductVariant.findByPk(item.variant_id, { transaction: t, lock: t.LOCK.UPDATE });
-        if (variant) {
-          await variant.increment('stock', { by: item.quantity, transaction: t });
-        }
-      } else if (item.product) {
+      if (item.product) {
         await item.product.increment('stock', { by: item.quantity, transaction: t });
       }
     }
@@ -1637,7 +1799,7 @@ exports.getAllOrders = async (req, res) => {
       include: [
         { model: User, as: 'customer', attributes: ['id', 'name', 'email', 'phone'] },
         { model: Wholesaler, as: 'wholesaler', attributes: ['id', 'name', 'business_name', 'email', 'phone'] },
-        { model: OrderItem, as: 'items', attributes: ['id', 'product_name', 'quantity', 'price', 'variant_id', 'variant_name'] }
+        { model: OrderItem, as: 'items', attributes: ['id', 'product_name', 'quantity', 'price'] }
       ]
     });
 
@@ -1688,125 +1850,7 @@ exports.updateOrderStatus = async (req, res) => {
     if (status === 'delivered') {
       const recipient = order.customer?.email || order.wholesaler?.email || null;
       if (recipient) {
-        const titleName = order.customer ? order.customer.name : (order.wholesaler ? order.wholesaler.business_name : 'Customer');
-        const identity = order.customer ? 'Customer' : 'Wholesaler';
-        const shippingFee = Number(order.shipping_fee || 0);
-        const subtotal = Number(order.total_amount || 0) + Number(order.discount_amount || 0) - shippingFee;
-        const discount = Number(order.discount_amount || 0);
-        const total = Number(order.total_amount || 0);
-        const dateStr = new Date(order.created_at).toLocaleString();
-        const rows = (order.items || []).map((it) => {
-          const variantHtml = it.variant_name
-            ? `<div style="font-size:11px;color:#6b7280;margin-top:2px;">${it.variant_name}</div>`
-            : '';
-          return `
-          <tr>
-            <td style="padding:8px;border-bottom:1px solid #eee;">
-              <div>${it.product_name}</div>
-              ${variantHtml}
-            </td>
-            <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">${it.quantity}</td>
-            <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">₹${Number(it.price).toFixed(2)}</td>
-            <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">₹${(Number(it.price) * it.quantity).toFixed(2)}</td>
-          </tr>
-        `}).join('');
-        const html = `
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Invoice #${order.id}</title>
-    <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; color: #222; }
-      .container { max-width: 900px; margin: 24px auto; padding: 24px; border: 1px solid #ddd; border-radius: 8px; }
-      .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
-      .brand { font-weight: 700; font-size: 20px; }
-      .meta { text-align: right; font-size: 14px; color: #555; }
-      .section { margin-top: 16px; }
-      .section h3 { margin: 0 0 8px 0; font-size: 16px; color: #333; }
-      table { width: 100%; border-collapse: collapse; }
-      .totals td { padding: 6px; }
-      .totals .label { text-align: right; color: #555; }
-      .totals .value { text-align: right; font-weight: 600; }
-      .footer { margin-top: 24px; font-size: 12px; color: #777; text-align: center; }
-      .badge { display: inline-block; padding: 4px 8px; border-radius: 12px; background: #e8f5e9; color: #2e7d32; font-size: 12px; }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <div>
-          <div class="brand">Ecommerce Ashoka</div>
-          <div style="color:#777;font-size:12px;">Invoice</div>
-        </div>
-        <div class="meta">
-          <div>Invoice #: ${order.id}</div>
-          <div>Date: ${dateStr}</div>
-          <div>Status: <span class="badge">${order.status}</span></div>
-        </div>
-      </div>
-
-      <div class="section">
-        <h3>Bill To</h3>
-        <div style="border:1px solid #eee;padding:12px;border-radius:6px;">
-          <div><strong>${identity}:</strong> ${titleName}</div>
-          <div><strong>Email:</strong> ${order.customer?.email || order.wholesaler?.email || '-'}</div>
-          <div><strong>Phone:</strong> ${order.customer?.phone || order.wholesaler?.phone || '-'}</div>
-        </div>
-      </div>
-
-      <div class="section">
-        <h3>Shipping Address</h3>
-        <div style="border:1px solid #eee;padding:12px;border-radius:6px;">
-          ${order.shipping_address || '-'}
-        </div>
-      </div>
-
-      <div class="section">
-        <h3>Items</h3>
-        <table>
-          <thead>
-            <tr>
-              <th style="text-align:left;padding:8px;border-bottom:1px solid #ccc;">Product</th>
-              <th style="text-align:center;padding:8px;border-bottom:1px solid #ccc;">Qty</th>
-              <th style="text-align:right;padding:8px;border-bottom:1px solid #ccc;">Price</th>
-              <th style="text-align:right;padding:8px;border-bottom:1px solid #ccc;">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows}
-          </tbody>
-        </table>
-      </div>
-
-      <div class="section">
-        <table class="totals">
-          <tr>
-            <td class="label" style="width:80%;">Subtotal</td>
-            <td class="value" style="width:20%;">₹${subtotal.toFixed(2)}</td>
-          </tr>
-          <tr>
-            <td class="label">Discount ${order.coupon_code ? '(' + order.coupon_code + ')' : ''}</td>
-            <td class="value">-₹${discount.toFixed(2)}</td>
-          </tr>
-          <tr>
-            <td class="label">Shipping</td>
-            <td class="value">₹${shippingFee.toFixed(2)}</td>
-          </tr>
-          <tr>
-            <td class="label"><strong>Grand Total</strong></td>
-            <td class="value"><strong>₹${total.toFixed(2)}</strong></td>
-          </tr>
-        </table>
-      </div>
-
-      <div class="footer">
-        This is a system-generated invoice. If you have questions, contact support.
-      </div>
-    </div>
-  </body>
-</html>
-        `;
+        const html = buildInvoiceHtml({ order, includePrintScript: false });
         const host = process.env.SMTP_HOST || process.env.MAIL_HOST;
         const port = parseInt(process.env.SMTP_PORT || process.env.MAIL_PORT || '0', 10);
         const user = process.env.SMTP_USER || process.env.MAIL_USER;
