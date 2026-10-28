@@ -681,7 +681,7 @@ const Checkout = () => {
         key: createData.key_id,
         amount: createData.amount,
         currency: createData.currency || 'INR',
-        name: 'Ashoka',
+        name: 'Olakh-Maharashtrachi',
         description: 'Order payment',
         order_id: createData.razorpay_order_id,
         prefill: {
