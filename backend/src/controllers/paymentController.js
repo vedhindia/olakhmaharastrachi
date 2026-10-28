@@ -226,7 +226,7 @@ const sendOrderConfirmationEmail = async (orderId) => {
           <tr>
             <td>
               <div style="text-align:center;margin-bottom:16px;color:#6b7280;font-size:12px;">
-                Payment confirmation from <span style="font-weight:600;color:#111827;">Ashoka</span>
+                Payment confirmation from <span style="font-weight:600;color:#111827;">Olakh-Maharashtrachi</span>
               </div>
             </td>
           </tr>
@@ -236,7 +236,7 @@ const sendOrderConfirmationEmail = async (orderId) => {
                 <div style="background:linear-gradient(90deg,#15803d,#22c55e);padding:18px 24px;color:#f9fafb;">
                   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;">
                     <div style="font-size:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">
-                      Ashoka
+                      Olakh-Maharashtrachi
                     </div>
                     <div style="text-align:right;margin-top:6px;font-size:12px;">
                       <div style="font-weight:600;">Payment Successful</div>
@@ -335,7 +335,7 @@ const sendOrderConfirmationEmail = async (orderId) => {
               </div>
 
               <div style="text-align:center;margin-top:16px;font-size:11px;color:#9ca3af;">
-                © ${new Date().getFullYear()} Ashoka. All rights reserved.
+                © ${new Date().getFullYear()} Olakh-Maharashtrachi. All rights reserved.
               </div>
             </td>
           </tr>
