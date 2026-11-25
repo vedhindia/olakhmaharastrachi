@@ -134,6 +134,7 @@ background: linear-gradient(135deg, #e7c249 0%, #f0ee80 100%);
 
 .icon-circle {
   width: 130px;
+  height: 200px;
   border: 1px solid #eef1f4;
   border-radius: 12px;
   display: flex;
