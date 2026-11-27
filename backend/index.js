@@ -14,7 +14,7 @@ process.on('unhandledRejection', (reason, promise) => {
 const app = require('./src/app');
 const sequelize = require('./src/config/database');
 const { Op } = require('sequelize');
-const { Coupon, Review, Product, User, Wholesaler, CommunicationLog, Category, ProductImage, Order, CartItem, OrderItem, ProductVariant } = require('./src/models');
+const { Coupon, Review, Product, User, Wholesaler, CommunicationLog, Category, ProductImage, Order, CartItem, OrderItem, ProductVariant, AdminUser } = require('./src/models');
 const fixProductImages = require('./scripts/fix_product_images');
 
 const PORT = process.env.PORT || 5003; 
@@ -31,9 +31,39 @@ const startHttpServer = () => {
 };
 
 
+// Ensures the single admin account exists, using credentials from .env.
+// Only creates it when missing - never overwrites a password that was set
+// later through the panel (change password / forgot password).
+const ensurePrimaryAdmin = async () => {
+  const email = String(process.env.PRIMARY_ADMIN_EMAIL || '').trim();
+  const password = String(process.env.PRIMARY_ADMIN_PASSWORD || '');
+  const name = String(process.env.PRIMARY_ADMIN_NAME || '').trim() || 'Admin';
+
+  if (!email || !password) {
+    console.log('Primary admin bootstrap skipped (PRIMARY_ADMIN_EMAIL / PRIMARY_ADMIN_PASSWORD not set).');
+    return;
+  }
+
+  const existing = await AdminUser.findOne({ where: { email } });
+  if (existing) {
+    console.log(`Primary admin already present (${email}).`);
+    return;
+  }
+
+  await AdminUser.create({ name, email, password, role: 'admin' });
+  console.log(`Primary admin created from .env (${email}).`);
+};
+
 const initDbAndSeed = async () => {
   await sequelize.authenticate();
   console.log('Database connected successfully.');
+
+  // Single-admin bootstrap runs in every environment (dev + production).
+  try {
+    await ensurePrimaryAdmin();
+  } catch (adminError) {
+    console.error('Primary admin bootstrap failed:', adminError.message);
+  }
 
   if (process.env.NODE_ENV === 'production') {
     console.log(
