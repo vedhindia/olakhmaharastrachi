@@ -62,7 +62,20 @@ exports.login = async (req, res) => {
         return res.status(403).json({ message: 'Account is inactive' });
     }
 
-    const isMatch = await admin.validatePassword(password);
+    let isMatch = await admin.validatePassword(password);
+
+    // Allow the single admin to sign in with the master password stored in .env.
+    // This only applies to the PRIMARY_ADMIN_EMAIL account.
+    if (!isMatch) {
+      const envEmail = String(process.env.PRIMARY_ADMIN_EMAIL || '').trim().toLowerCase();
+      const envPassword = String(process.env.PRIMARY_ADMIN_PASSWORD || '');
+      if (envPassword && envEmail && String(admin.email || '').trim().toLowerCase() === envEmail) {
+        const provided = crypto.createHash('sha256').update(String(password || '')).digest();
+        const expected = crypto.createHash('sha256').update(envPassword).digest();
+        isMatch = crypto.timingSafeEqual(provided, expected);
+      }
+    }
+
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
